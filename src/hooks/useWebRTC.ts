@@ -270,7 +270,11 @@ export function useWebRTC(roomId: string, password?: string, ready: boolean = tr
       transferStatesRef.current[id] = { receivedChunks: [], cancelled: false, reader: undefined, currentFile: undefined };
     }
 
-    dc.onopen = () => console.log(`File channel ${id} opened`);
+    // Don't set dc.onopen here — the sender sets it to a Promise resolver.
+    // Only log on the receiver side (sender already logs inline).
+    if (dc.readyState === "open") {
+      console.log(`File channel ${id} already open`);
+    }
     dc.onclose = () => {
       console.log(`File channel ${id} closed`);
       setTransfers((prev) => {
@@ -432,17 +436,36 @@ export function useWebRTC(roomId: string, password?: string, ready: boolean = tr
       console.log("Connection state:", pc.connectionState);
       if (pc.connectionState === "connected") {
         setIsConnected(true);
-      } else if (
-        pc.connectionState === "failed" ||
-        pc.connectionState === "closed"
-      ) {
+      } else if (pc.connectionState === "failed") {
+        console.log("Connection failed — attempting ICE restart");
+        setIsConnected(false);
+        // ICE restart: re-negotiate with fresh candidates
+        if (isInitiator && pc.signalingState !== "closed") {
+          pc.restartIce();
+          pc.createOffer({ iceRestart: true }).then(async (offer) => {
+            if (pc.signalingState === "closed") return;
+            await pc.setLocalDescription(offer);
+            socket.emit("signal", {
+              to: remoteId,
+              from: socket.id,
+              signal: { type: "offer", offer },
+            });
+          }).catch((err) => console.error("ICE restart offer failed:", err));
+        }
+      } else if (pc.connectionState === "closed") {
         setIsConnected(false);
         setPeerId(null);
         setLatency(null);
-        // Don't null out pcRef here — let the next signal/user-joined handle it
       } else if (pc.connectionState === "disconnected") {
-        // Transient — may recover; don't immediately tear down
+        // May recover on its own within a few seconds — don't tear down yet
         setIsConnected(false);
+      }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      console.log("ICE connection state:", pc.iceConnectionState);
+      if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
+        setIsConnected(true);
       }
     };
 
@@ -465,6 +488,7 @@ export function useWebRTC(roomId: string, password?: string, ready: boolean = tr
           setupSignalingChannel(dc, false);
         } else if (dc.label.startsWith("file-")) {
           const id = dc.label.replace("file-", "");
+          dc.binaryType = "arraybuffer";
           dc.bufferedAmountLowThreshold = 65536;
           setupFileDataChannel(dc, id);
         }
@@ -493,9 +517,15 @@ export function useWebRTC(roomId: string, password?: string, ready: boolean = tr
     };
 
     const handleSignal = async ({ from, signal }: { from: string, signal: any }) => {
-      if (!pcRef.current || pcRef.current.connectionState === "failed" || pcRef.current.connectionState === "closed") {
+      const needsNewPc = !pcRef.current || pcRef.current.connectionState === "closed";
+      const isFailedWithOffer = pcRef.current?.connectionState === "failed" && signal.type === "offer";
+      if (needsNewPc || isFailedWithOffer) {
         if (signal.type === "offer") {
-          createPeerConnection(from, false);
+          // Only create a new pc if truly gone; if failed + offer it might be an ICE restart
+          // so only recreate if the signaling state is also closed
+          if (!pcRef.current || pcRef.current.signalingState === "closed") {
+            createPeerConnection(from, false);
+          }
         } else {
           // Can't process a non-offer signal without a peer connection — discard
           return;
@@ -611,6 +641,7 @@ export function useWebRTC(roomId: string, password?: string, ready: boolean = tr
 
     const id = existingId || Math.random().toString(36).substring(7);
     const dc = pcRef.current.createDataChannel(`file-${id}`);
+    dc.binaryType = "arraybuffer";
     dc.bufferedAmountLowThreshold = 65536;
     setupFileDataChannel(dc, id);
 
