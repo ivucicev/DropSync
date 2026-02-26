@@ -1,0 +1,5 @@
+{
+  "name": "DropSync",
+  "description": "Secure, simple, and private P2P file sharing using WebRTC and WebSockets for signaling.",
+  "requestFramePermissions": []
+}
