@@ -42,6 +42,8 @@ export function useWebRTC(roomId: string, password?: string, ready: boolean = tr
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const peerIdRef = useRef<string | null>(null);
+  const isInitiatorRef = useRef<boolean>(false);
+  const disconnectWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeChannelsRef = useRef<Record<string, RTCDataChannel>>({});
   const transferStatesRef = useRef<Record<string, {
     receivedChunks: Uint8Array[],
@@ -57,9 +59,14 @@ export function useWebRTC(roomId: string, password?: string, ready: boolean = tr
   useEffect(() => { peerIdRef.current = peerId; }, [peerId]);
 
   const teardownPeerConnection = useCallback(() => {
+    if (disconnectWatchdogRef.current) {
+      clearTimeout(disconnectWatchdogRef.current);
+      disconnectWatchdogRef.current = null;
+    }
     if (pcRef.current) {
       pcRef.current.onicecandidate = null;
       pcRef.current.onconnectionstatechange = null;
+      pcRef.current.oniceconnectionstatechange = null;
       pcRef.current.ondatachannel = null;
       pcRef.current.close();
       pcRef.current = null;
@@ -387,15 +394,35 @@ export function useWebRTC(roomId: string, password?: string, ready: boolean = tr
     };
   }, []);
 
+  const attemptIceRestart = useCallback(() => {
+    const pc = pcRef.current;
+    const remoteId = peerIdRef.current;
+    if (!pc || !remoteId || pc.signalingState === "closed") return;
+    console.log("Attempting ICE restart");
+    pc.restartIce();
+    pc.createOffer({ iceRestart: true }).then(async (offer) => {
+      if (pc.signalingState === "closed") return;
+      await pc.setLocalDescription(offer);
+      socket.emit("signal", { to: remoteId, from: socket.id, signal: { type: "offer", offer } });
+    }).catch((err) => console.error("ICE restart offer failed:", err));
+  }, []);
+
   const createPeerConnection = useCallback((remoteId: string, isInitiator: boolean) => {
+    // Cancel any pending watchdog from a previous connection
+    if (disconnectWatchdogRef.current) {
+      clearTimeout(disconnectWatchdogRef.current);
+      disconnectWatchdogRef.current = null;
+    }
     // Clean up any existing connection first
     if (pcRef.current) {
       pcRef.current.onicecandidate = null;
       pcRef.current.onconnectionstatechange = null;
+      pcRef.current.oniceconnectionstatechange = null;
       pcRef.current.ondatachannel = null;
       pcRef.current.close();
       pcRef.current = null;
     }
+    isInitiatorRef.current = isInitiator;
     setAuthError(null);
 
     const pc = new RTCPeerConnection({
@@ -435,36 +462,38 @@ export function useWebRTC(roomId: string, password?: string, ready: boolean = tr
     pc.onconnectionstatechange = () => {
       console.log("Connection state:", pc.connectionState);
       if (pc.connectionState === "connected") {
+        if (disconnectWatchdogRef.current) {
+          clearTimeout(disconnectWatchdogRef.current);
+          disconnectWatchdogRef.current = null;
+        }
         setIsConnected(true);
       } else if (pc.connectionState === "failed") {
-        console.log("Connection failed — attempting ICE restart");
         setIsConnected(false);
-        // ICE restart: re-negotiate with fresh candidates
-        if (isInitiator && pc.signalingState !== "closed") {
-          pc.restartIce();
-          pc.createOffer({ iceRestart: true }).then(async (offer) => {
-            if (pc.signalingState === "closed") return;
-            await pc.setLocalDescription(offer);
-            socket.emit("signal", {
-              to: remoteId,
-              from: socket.id,
-              signal: { type: "offer", offer },
-            });
-          }).catch((err) => console.error("ICE restart offer failed:", err));
-        }
+        // Both sides attempt ICE restart; initiator sends the offer
+        if (isInitiatorRef.current) attemptIceRestart();
       } else if (pc.connectionState === "closed") {
         setIsConnected(false);
         setPeerId(null);
         setLatency(null);
       } else if (pc.connectionState === "disconnected") {
-        // May recover on its own within a few seconds — don't tear down yet
         setIsConnected(false);
+        // Give WebRTC 4s to self-heal, then force an ICE restart if we're initiator
+        disconnectWatchdogRef.current = setTimeout(() => {
+          if (pcRef.current?.connectionState === "disconnected" && isInitiatorRef.current) {
+            console.log("Watchdog: still disconnected — triggering ICE restart");
+            attemptIceRestart();
+          }
+        }, 4000);
       }
     };
 
     pc.oniceconnectionstatechange = () => {
       console.log("ICE connection state:", pc.iceConnectionState);
       if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
+        if (disconnectWatchdogRef.current) {
+          clearTimeout(disconnectWatchdogRef.current);
+          disconnectWatchdogRef.current = null;
+        }
         setIsConnected(true);
       }
     };
@@ -567,17 +596,19 @@ export function useWebRTC(roomId: string, password?: string, ready: boolean = tr
 
     const handleReconnect = () => {
       console.log("Socket reconnected — rejoining room", roomId);
-      socket.emit("join-room", roomId);
-      // If we previously had a peer, tear down the stale connection and wait
-      // for them to re-join (their socket also reconnected and will re-emit join-room,
-      // triggering user-joined for us). If they were already in the room before us,
-      // the server will emit user-joined to them, making them the initiator instead.
-      if (peerIdRef.current) {
-        teardownPeerConnection();
-        setIsConnected(false);
-        setPeerId(null);
-        setLatency(null);
-      }
+      // Small random jitter (0–500ms) so both peers don't emit join-room at the
+      // exact same tick, which would cause the server to see them arrive simultaneously
+      // and emit user-joined to neither side.
+      const jitter = Math.random() * 500;
+      setTimeout(() => {
+        socket.emit("join-room", roomId);
+        if (peerIdRef.current) {
+          teardownPeerConnection();
+          setIsConnected(false);
+          setPeerId(null);
+          setLatency(null);
+        }
+      }, jitter);
     };
 
     socket.on("user-joined", handleUserJoined);
