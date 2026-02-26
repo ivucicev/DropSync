@@ -429,23 +429,31 @@ export function useWebRTC(roomId: string, password?: string, ready: boolean = tr
       iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
         { urls: "stun:stun1.l.google.com:19302" },
-        // Open Relay Project — free TURN for traversing carrier-grade NAT,
-        // mobile networks (5G), and reverse proxies like Cloudflare tunnels
-        {
-          urls: "turn:openrelay.metered.ca:80",
-          username: "openrelayproject",
-          credential: "openrelayproject",
-        },
-        {
-          urls: "turn:openrelay.metered.ca:443",
-          username: "openrelayproject",
-          credential: "openrelayproject",
-        },
-        {
-          urls: "turn:openrelay.metered.ca:443?transport=tcp",
-          username: "openrelayproject",
-          credential: "openrelayproject",
-        },
+        // Self-hosted Coturn — handles 5G/CGNAT where STUN alone fails.
+        // Set VITE_TURN_URL, VITE_TURN_USERNAME, VITE_TURN_CREDENTIAL in .env
+        ...(import.meta.env.VITE_TURN_URL ? [
+          {
+            urls: [
+              `turn:${import.meta.env.VITE_TURN_URL}:3478`,
+              `turn:${import.meta.env.VITE_TURN_URL}:3478?transport=tcp`,
+              `turns:${import.meta.env.VITE_TURN_URL}:5349`,
+            ],
+            username: import.meta.env.VITE_TURN_USERNAME as string,
+            credential: import.meta.env.VITE_TURN_CREDENTIAL as string,
+          },
+        ] : [
+          // Fallback: Open Relay free TURN (rate-limited, use only if no self-hosted TURN)
+          {
+            urls: "turn:openrelay.metered.ca:80",
+            username: "openrelayproject",
+            credential: "openrelayproject",
+          },
+          {
+            urls: "turn:openrelay.metered.ca:443?transport=tcp",
+            username: "openrelayproject",
+            credential: "openrelayproject",
+          },
+        ]),
       ],
     });
 
