@@ -167,24 +167,40 @@ export function useWebRTC(roomId: string, password?: string) {
     });
 
     socket.on("signal", async ({ from, signal }) => {
-      if (!pcRef.current) {
+      if (!pcRef.current || pcRef.current.signalingState === "closed") {
         createPeerConnection(from, false);
       }
 
       const pc = pcRef.current!;
-      if (signal.type === "offer") {
-        await pc.setRemoteDescription(new RTCSessionDescription(signal.offer));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        socket.emit("signal", {
-          to: from,
-          from: socket.id,
-          signal: { type: "answer", answer },
-        });
-      } else if (signal.type === "answer") {
-        await pc.setRemoteDescription(new RTCSessionDescription(signal.answer));
-      } else if (signal.type === "candidate") {
-        await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+      if (pc.signalingState === "closed") return;
+
+      try {
+        if (signal.type === "offer") {
+          await pc.setRemoteDescription(new RTCSessionDescription(signal.offer));
+          if (pc.signalingState === "closed") return;
+          const answer = await pc.createAnswer();
+          if (pc.signalingState === "closed") return;
+          await pc.setLocalDescription(answer);
+          socket.emit("signal", {
+            to: from,
+            from: socket.id,
+            signal: { type: "answer", answer },
+          });
+        } else if (signal.type === "answer") {
+          if (pc.signalingState !== "closed") {
+            await pc.setRemoteDescription(new RTCSessionDescription(signal.answer));
+          }
+        } else if (signal.type === "candidate") {
+          if (pc.signalingState !== "closed") {
+            try {
+              await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+            } catch (e) {
+              console.warn("Failed to add ICE candidate:", e);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error handling WebRTC signal:", err);
       }
     });
 
