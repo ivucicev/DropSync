@@ -498,6 +498,21 @@ export function useWebRTC(roomId: string, password?: string, ready: boolean = tr
       }
     };
 
+    // Both sides register ondatachannel — either peer can send files,
+    // so either peer may receive a dynamically created data channel.
+    pc.ondatachannel = (event) => {
+      const dc = event.channel;
+      // Set binaryType immediately — before any messages can arrive
+      dc.binaryType = "arraybuffer";
+      if (dc.label === "signaling") {
+        setupSignalingChannel(dc, false);
+      } else if (dc.label.startsWith("file-")) {
+        const id = dc.label.replace("file-", "");
+        dc.bufferedAmountLowThreshold = 16384;
+        setupFileDataChannel(dc, id);
+      }
+    };
+
     if (isInitiator) {
       const sigDc = pc.createDataChannel("signaling");
       setupSignalingChannel(sigDc, true);
@@ -510,19 +525,6 @@ export function useWebRTC(roomId: string, password?: string, ready: boolean = tr
           signal: { type: "offer", offer },
         });
       }).catch((err) => console.error("createOffer failed:", err));
-    } else {
-      pc.ondatachannel = (event) => {
-        const dc = event.channel;
-        // Set binaryType immediately — before any messages can arrive
-        dc.binaryType = "arraybuffer";
-        if (dc.label === "signaling") {
-          setupSignalingChannel(dc, false);
-        } else if (dc.label.startsWith("file-")) {
-          const id = dc.label.replace("file-", "");
-          dc.bufferedAmountLowThreshold = 16384;
-          setupFileDataChannel(dc, id);
-        }
-      };
     }
 
     pcRef.current = pc;
@@ -627,6 +629,20 @@ export function useWebRTC(roomId: string, password?: string, ready: boolean = tr
     };
   }, [roomId, ready, createPeerConnection, teardownPeerConnection]);
 
+  // Keepalive ping over the signaling channel every 15s.
+  // Cloudflare and many NATs drop idle UDP/TCP flows after ~30s of silence.
+  // A tiny JSON ping is enough to reset the idle timer on both ends.
+  useEffect(() => {
+    if (!isConnected) return;
+    const interval = setInterval(() => {
+      const dc = signalingChannelRef.current;
+      if (dc?.readyState === "open") {
+        dc.send(JSON.stringify({ type: "ping" }));
+      }
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [isConnected]);
+
   useEffect(() => {
     if (!isConnected || !pcRef.current) {
       setLatency(null);
@@ -710,7 +726,7 @@ export function useWebRTC(roomId: string, password?: string, ready: boolean = tr
         if (done) break;
 
         for (let i = 0; i < value.length; i += CHUNK_SIZE) {
-          let chunk: Uint8Array<ArrayBuffer> = value.slice(i, i + CHUNK_SIZE) as Uint8Array<ArrayBuffer>;
+          let chunk: Uint8Array = value.slice(i, i + CHUNK_SIZE);
           const pw = passwordRef.current;
           if (pw) chunk = await encryptChunk(chunk, pw);
 
