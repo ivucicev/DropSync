@@ -16,6 +16,9 @@ async function startServer() {
       origin: "*",
       methods: ["GET", "POST"],
     },
+    // Cloudflare tunnels and most reverse proxies break HTTP long-polling.
+    // WebSocket-only avoids the polling→upgrade handshake that often hangs.
+    transports: ["websocket"],
   });
 
   const PORT = 3000;

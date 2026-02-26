@@ -398,6 +398,23 @@ export function useWebRTC(roomId: string, password?: string, ready: boolean = tr
       iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
         { urls: "stun:stun1.l.google.com:19302" },
+        // Open Relay Project — free TURN for traversing carrier-grade NAT,
+        // mobile networks (5G), and reverse proxies like Cloudflare tunnels
+        {
+          urls: "turn:openrelay.metered.ca:80",
+          username: "openrelayproject",
+          credential: "openrelayproject",
+        },
+        {
+          urls: "turn:openrelay.metered.ca:443",
+          username: "openrelayproject",
+          credential: "openrelayproject",
+        },
+        {
+          urls: "turn:openrelay.metered.ca:443?transport=tcp",
+          username: "openrelayproject",
+          credential: "openrelayproject",
+        },
       ],
     });
 

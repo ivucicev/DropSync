@@ -1,5 +1,9 @@
 import { io } from "socket.io-client";
 
-const socket = io(window.location.origin);
+// Force WebSocket transport only — Cloudflare tunnels and reverse proxies
+// break Socket.IO's default polling→upgrade handshake.
+const socket = io(window.location.origin, {
+  transports: ["websocket"],
+});
 
 export default socket;
