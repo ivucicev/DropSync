@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import socket from "../services/socket";
 import { encryptChunk, decryptChunk, signChallenge, verifyChallenge } from "../utils/crypto";
 
-const CHUNK_SIZE = 16384; // 16KB chunks
+const CHUNK_SIZE = 8192; // 8KB chunks — safer for TURN-relayed connections
 
 export interface FileTransferProgress {
   id: string;
@@ -513,12 +513,13 @@ export function useWebRTC(roomId: string, password?: string, ready: boolean = tr
     } else {
       pc.ondatachannel = (event) => {
         const dc = event.channel;
+        // Set binaryType immediately — before any messages can arrive
+        dc.binaryType = "arraybuffer";
         if (dc.label === "signaling") {
           setupSignalingChannel(dc, false);
         } else if (dc.label.startsWith("file-")) {
           const id = dc.label.replace("file-", "");
-          dc.binaryType = "arraybuffer";
-          dc.bufferedAmountLowThreshold = 65536;
+          dc.bufferedAmountLowThreshold = 16384;
           setupFileDataChannel(dc, id);
         }
       };
@@ -673,7 +674,7 @@ export function useWebRTC(roomId: string, password?: string, ready: boolean = tr
     const id = existingId || Math.random().toString(36).substring(7);
     const dc = pcRef.current.createDataChannel(`file-${id}`);
     dc.binaryType = "arraybuffer";
-    dc.bufferedAmountLowThreshold = 65536;
+    dc.bufferedAmountLowThreshold = 16384;
     setupFileDataChannel(dc, id);
 
     const state = transferStatesRef.current[id] = { receivedChunks: [], cancelled: false, reader: undefined, currentFile: undefined };
@@ -683,13 +684,18 @@ export function useWebRTC(roomId: string, password?: string, ready: boolean = tr
       [id]: { id, name: file.name, size: file.size, progress: 0, status: "sending", direction: "send", file }
     }));
 
-    // Wait for channel to open
+    // Wait for channel to open on both sides
     if (dc.readyState !== "open") {
       await new Promise((resolve, reject) => {
         dc.onopen = () => resolve(null);
-        setTimeout(() => reject(new Error("Channel open timeout")), 5000);
+        setTimeout(() => reject(new Error("Channel open timeout")), 10000);
       });
     }
+
+    // Small delay after open — gives the TURN relay time to fully establish
+    // the relay path before we start sending. Without this, the first few
+    // chunks can be lost on TURN-relayed connections.
+    await new Promise(r => setTimeout(r, 100));
 
     try {
       dc.send(JSON.stringify({ type: "file-start", name: file.name, size: file.size }));
@@ -708,7 +714,8 @@ export function useWebRTC(roomId: string, password?: string, ready: boolean = tr
           const pw = passwordRef.current;
           if (pw) chunk = await encryptChunk(chunk, pw);
 
-          if (dc.bufferedAmount > dc.bufferedAmountLowThreshold) {
+          // Pause when buffer exceeds 64KB — conservative limit for TURN relay paths
+          if (dc.bufferedAmount > 65536) {
             await new Promise((resolve, reject) => {
               const timeout = setTimeout(() => {
                 dc.onbufferedamountlow = null;
