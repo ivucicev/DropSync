@@ -1,68 +1,93 @@
 # DropSync
 
-> Browser-to-browser P2P file sharing and chat. No cloud, no storage, no limits.
+**Send files directly to anyone. No accounts, no cloud, no limits.**
 
-![DropSync screenshot](public/screenshot.png)
+DropSync creates an encrypted tunnel straight between two browsers — your files go from your machine to theirs and nowhere else. Share the link, connect, and drop.
 
-## What it does
+![DropSync](public/screenshot.png)
 
-DropSync creates a direct encrypted tunnel between two browsers using WebRTC. Files and messages travel peer-to-peer — nothing touches a server.
+---
 
-- **No file size limits** — stream gigabytes directly between devices
-- **End-to-end encrypted** — optional AES-GCM 256 encryption with PBKDF2-derived keys
-- **Password-protected rooms** — HMAC-SHA256 challenge-response handshake before any data flows
-- **Real-time chat** — P2P text chat over the same signaling data channel
-- **Transfer history** — track sent/received files with resend support
-- **QR code sharing** — scan to join from mobile
-- **Peer info** — live latency, signal quality, and peer IP from WebRTC ICE stats
+## Why DropSync?
 
-## Stack
+Most file sharing tools upload your data to a server, charge you for storage, enforce file size limits, and keep logs. DropSync does none of that.
 
-| Layer | Tech |
-|---|---|
-| Frontend | React 19, TypeScript, Tailwind CSS v4, Framer Motion |
-| Transport | WebRTC data channels |
-| Signaling | Socket.IO (Express server) |
-| Crypto | Web Crypto API (AES-GCM, PBKDF2, HMAC-SHA256) |
-| Bundler | Vite |
+The moment both browsers are connected, the server steps out of the way. Everything — files, messages, keys — flows peer-to-peer, encrypted in your browser before it leaves.
 
-## Run locally
+---
 
-**Prerequisites:** Node.js 18+
+## Features
+
+**Zero infrastructure overhead**
+Files go directly between devices using WebRTC. The server only brokers the initial handshake, never sees your data.
+
+**End-to-end encryption**
+Set a room password and all transfers are encrypted with AES-GCM 256. Keys are derived locally with PBKDF2 — your password never leaves your device.
+
+**Password-protected rooms**
+Rooms can require a password before anyone connects. Authentication uses an HMAC-SHA256 challenge-response so the password itself is never transmitted.
+
+**No file size limits**
+Stream gigabytes as fast as your connection allows. WebRTC data channels handle the flow control.
+
+**Built-in chat**
+Text chat runs over the same encrypted P2P channel. No separate service needed.
+
+**One link to share**
+Generate a room, copy the link or scan the QR code, send it to your peer. That's the whole onboarding flow.
+
+**Live connection info**
+See latency, signal quality, and your peer's IP directly from WebRTC stats.
+
+---
+
+## Get started
 
 ```bash
 npm install
 npm run dev
 ```
 
-The app runs at `http://localhost:3000`.
+Open `http://localhost:3000`, create a room, share the URL with anyone. They open it, you're connected.
 
-Open a second browser tab/window, navigate to the same URL, and you'll be connected peer-to-peer.
-
-## How it works
-
-1. **Creator** opens the app, optionally sets a room password, and clicks **Create Secure Room**
-2. A room ID is generated and appended to the URL (`?room=<id>`)
-3. **Joiner** opens the shared URL, enters the room password if required
-4. Socket.IO relays the WebRTC offer/answer/ICE handshake — after that the signaling server is no longer involved
-5. All file data and chat messages flow directly between browsers over RTCDataChannel
-
-## Project structure
-
-```
-src/
-  hooks/useWebRTC.ts      # WebRTC connection, file transfer, chat, auth handshake
-  components/FileShare.tsx # Main room UI
-  utils/crypto.ts          # AES-GCM encrypt/decrypt, HMAC sign/verify
-  services/socket.ts       # Socket.IO client
-  App.tsx                  # Landing page + room routing
-server.ts                  # Socket.IO signaling server (Express)
-```
-
-## Docker
+Or with Docker:
 
 ```bash
 docker compose up
 ```
 
-Runs the signaling server on port 3000.
+---
+
+## How it works
+
+1. You create a room — a unique ID is added to the URL
+2. Your peer opens that URL (optionally enters the room password)
+3. Socket.IO relays the WebRTC handshake once
+4. The server is done — all data flows directly between browsers
+5. Files and chat messages are encrypted locally before sending (if a password is set)
+
+---
+
+## Stack
+
+| | |
+|---|---|
+| Frontend | React 19, TypeScript, Tailwind CSS v4, Framer Motion |
+| P2P transport | WebRTC RTCDataChannel |
+| Signaling | Socket.IO + Express |
+| Cryptography | Web Crypto API — AES-GCM, PBKDF2, HMAC-SHA256 |
+| Bundler | Vite 6 |
+
+---
+
+## Project structure
+
+```
+src/
+  hooks/useWebRTC.ts       WebRTC connection, transfers, chat, auth
+  components/FileShare.tsx Room UI
+  utils/crypto.ts          Encryption and HMAC helpers
+  services/socket.ts       Socket.IO client
+  App.tsx                  Landing page and room routing
+server.ts                  Signaling server
+```
