@@ -58,6 +58,7 @@ export function useWebRTC(roomId: string, password?: string) {
 
     if (isInitiator) {
       const dc = pc.createDataChannel("fileTransfer");
+      dc.bufferedAmountLowThreshold = 65536; // 64KB
       setupDataChannel(dc);
       dcRef.current = dc;
 
@@ -71,8 +72,10 @@ export function useWebRTC(roomId: string, password?: string) {
       });
     } else {
       pc.ondatachannel = (event) => {
-        setupDataChannel(event.channel);
-        dcRef.current = event.channel;
+        const dc = event.channel;
+        dc.bufferedAmountLowThreshold = 65536; // 64KB
+        setupDataChannel(dc);
+        dcRef.current = dc;
       };
     }
 
@@ -231,6 +234,7 @@ export function useWebRTC(roomId: string, password?: string) {
     
     try {
       // Send file metadata
+      if (dc.readyState !== "open") throw new Error("Connection not ready");
       dc.send(JSON.stringify({ type: "file-start", name: file.name, size: file.size }));
 
       setTransferProgress({
@@ -263,7 +267,10 @@ export function useWebRTC(roomId: string, password?: string) {
           // Wait for buffer to clear if it's getting full
           if (dc.bufferedAmount > dc.bufferedAmountLowThreshold) {
             await new Promise((resolve, reject) => {
-              const timeout = setTimeout(() => reject(new Error("Buffer timeout")), 10000);
+              const timeout = setTimeout(() => {
+                dc.onbufferedamountlow = null;
+                reject(new Error("Buffer timeout"));
+              }, 30000); // Increase to 30s
               dc.onbufferedamountlow = () => {
                 clearTimeout(timeout);
                 dc.onbufferedamountlow = null;
@@ -289,7 +296,9 @@ export function useWebRTC(roomId: string, password?: string) {
         }
       }
 
-      dc.send(JSON.stringify({ type: "file-end" }));
+      if (dc.readyState === "open") {
+        dc.send(JSON.stringify({ type: "file-end" }));
+      }
       setTransferProgress((prev) => prev ? { ...prev, progress: 100, status: "completed" } : null);
     } catch (err) {
       if (cancelRef.current) {
