@@ -6,31 +6,35 @@ import { motion } from "motion/react";
 export default function App() {
   const [roomId, setRoomId] = useState<string | null>(null);
   const [password, setPassword] = useState<string>("");
+  const [isCreator, setIsCreator] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const room = params.get("room");
     if (room) {
       setRoomId(room);
+      setIsCreator(false);
     }
   }, []);
 
   const createRoom = () => {
     const newId = Math.random().toString(36).substring(2, 9);
     setRoomId(newId);
+    setIsCreator(true);
     window.history.pushState({}, "", `?room=${newId}`);
   };
 
   const handleLeave = () => {
     setRoomId(null);
     setPassword("");
+    setIsCreator(false);
     window.history.pushState({}, "", "/");
   };
 
   if (roomId) {
     return (
       <div className="min-h-screen bg-zinc-50 py-12 px-4">
-        <FileShare roomId={roomId} initialPassword={password} onLeave={handleLeave} />
+        <FileShare roomId={roomId} initialPassword={isCreator ? password : undefined} onLeave={handleLeave} />
       </div>
     );
   }

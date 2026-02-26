@@ -5,6 +5,35 @@
 const ITERATIONS = 100000;
 const SALT = new TextEncoder().encode("dropsync-p2p-salt"); // In a real app, this might be unique per room
 
+async function deriveHmacKey(password: string): Promise<CryptoKey> {
+  const encoder = new TextEncoder();
+  const raw = await window.crypto.subtle.importKey(
+    "raw",
+    encoder.encode(password),
+    "PBKDF2",
+    false,
+    ["deriveKey"]
+  );
+  return window.crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt: SALT, iterations: ITERATIONS, hash: "SHA-256" },
+    raw,
+    { name: "HMAC", hash: "SHA-256", length: 256 },
+    false,
+    ["sign", "verify"]
+  );
+}
+
+export async function signChallenge(challenge: Uint8Array, password: string): Promise<Uint8Array> {
+  const key = await deriveHmacKey(password);
+  const sig = await window.crypto.subtle.sign("HMAC", key, challenge);
+  return new Uint8Array(sig);
+}
+
+export async function verifyChallenge(challenge: Uint8Array, signature: Uint8Array, password: string): Promise<boolean> {
+  const key = await deriveHmacKey(password);
+  return window.crypto.subtle.verify("HMAC", key, signature, challenge);
+}
+
 async function deriveKey(password: string): Promise<CryptoKey> {
   const encoder = new TextEncoder();
   const passwordKey = await window.crypto.subtle.importKey(

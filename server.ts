@@ -44,6 +44,12 @@ async function startServer() {
 
     socket.on("disconnect", () => {
       console.log("User disconnected:", socket.id);
+      // Notify all rooms this socket was in so peers can reset
+      socket.rooms.forEach((roomId) => {
+        if (roomId !== socket.id) {
+          socket.to(roomId).emit("user-left", socket.id);
+        }
+      });
     });
   });
 

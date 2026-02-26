@@ -1,14 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useWebRTC, FileTransferProgress } from "../hooks/useWebRTC";
-import { 
-  FileUp, 
-  Share2, 
-  CheckCircle2, 
-  Loader2, 
-  Copy, 
-  Users, 
+import { useWebRTC, FileTransferProgress, ChatMessage } from "../hooks/useWebRTC";
+import {
+  FileUp,
+  Loader2,
+  Copy,
   FileIcon,
-  ArrowRightLeft,
   AlertCircle,
   Shield,
   X,
@@ -16,7 +12,6 @@ import {
   Signal,
   SignalHigh,
   SignalLow,
-  Zap,
   FileText,
   FileImage,
   FileVideo,
@@ -30,7 +25,11 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   RotateCcw,
-  Search
+  Search,
+  Download,
+  Check,
+  MessageSquare,
+  Send,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { QRCodeSVG } from "qrcode.react";
@@ -53,25 +52,37 @@ interface FileShareProps {
 }
 
 export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, onLeave }) => {
-  const [password, setPassword] = useState(initialPassword || "");
-  const [isPasswordSet, setIsPasswordSet] = useState(!!initialPassword);
-  const { 
-    isConnected, 
-    sendFiles, 
-    transfers, 
-    latency, 
-    cancelTransfer, 
-    leaveRoom, 
+  // initialPassword defined (even as "") means the creator already decided — skip the prompt.
+  // undefined means the user arrived via a shared link and hasn't been asked yet.
+  const [password, setPassword] = useState(initialPassword ?? "");
+  const [isPasswordSet, setIsPasswordSet] = useState(initialPassword !== undefined);
+  const effectivePassword = isPasswordSet && password ? password : undefined;
+  const {
+    isConnected,
+    authError,
+    peerId,
+    peerIp,
+    sendFiles,
+    transfers,
+    pendingFiles,
+    latency,
+    cancelTransfer,
+    acceptFile,
+    declineFile,
+    leaveRoom,
     retryTransfer,
-    inspectConnection 
-  } = useWebRTC(roomId, isPasswordSet ? password : undefined);
+    inspectConnection,
+    chatMessages,
+    sendChat,
+  } = useWebRTC(roomId, effectivePassword, isPasswordSet);
   const [isDragging, setIsDragging] = useState(false);
-  const [showError, setShowError] = useState(false);
   const [stats, setStats] = useState({ sent: 0, received: 0 });
   const [history, setHistory] = useState<any[]>([]);
   const [showQR, setShowQR] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: "success" | "info" } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const [chatInput, setChatInput] = useState("");
 
   useEffect(() => {
     if (notification) {
@@ -81,11 +92,21 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
   }, [notification]);
 
   useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
+
+  // When auth fails on the joiner side, kick back to password screen so they can retry.
+  // The creator side stays on the main UI — the error is shown in the status bar.
+  const isJoiner = initialPassword === undefined;
+  useEffect(() => {
+    if (authError && isJoiner) {
+      setIsPasswordSet(false);
+      setPassword("");
+    }
+  }, [authError, isJoiner]);
+
+  useEffect(() => {
     (Object.values(transfers) as FileTransferProgress[]).forEach(transfer => {
-      if (transfer.status === "error") {
-        setShowError(true);
-      }
-      
       if (["completed", "error", "cancelled"].includes(transfer.status)) {
         // Add to history if not already there
         setHistory(prev => {
@@ -136,35 +157,52 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
     if (onLeave) onLeave();
   };
 
-  if (!isPasswordSet && !initialPassword) {
+  const handleSendChat = () => {
+    const text = chatInput.trim();
+    if (!text || !isConnected) return;
+    sendChat(text);
+    setChatInput("");
+  };
+
+  if (!isPasswordSet) {
     return (
       <div className="max-w-md mx-auto p-8 bg-white rounded-[2.5rem] border border-zinc-100 shadow-xl shadow-zinc-200/50 space-y-8">
         <div className="space-y-2 text-center">
-          <div className="w-16 h-16 bg-zinc-900 rounded-2xl flex items-center justify-center mx-auto mb-6">
+          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 ${authError ? "bg-red-500" : "bg-zinc-900"}`}>
             <Shield className="w-8 h-8 text-white" />
           </div>
-          <h2 className="text-2xl font-medium text-zinc-900">Secure Room</h2>
+          <h2 className="text-2xl font-medium text-zinc-900">{authError ? "Wrong Password" : "Secure Room"}</h2>
           <p className="text-zinc-500 text-sm leading-relaxed">
-            This room may be protected. Enter the password to enable end-to-end encryption for your transfers.
+            {authError ?? "This room may be protected. Enter the password to enable end-to-end encryption for your transfers."}
           </p>
         </div>
 
         <div className="space-y-4">
           <div className="space-y-2">
             <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em]">Room Password</label>
-            <input 
+            <input
               type="password"
               placeholder="Enter password..."
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-5 py-4 bg-zinc-50 border border-zinc-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-zinc-900/10 transition-all font-medium"
+              onKeyDown={(e) => e.key === "Enter" && setIsPasswordSet(true)}
+              autoFocus
+              className={`w-full px-5 py-4 bg-zinc-50 border rounded-2xl focus:outline-none focus:ring-2 transition-all font-medium ${
+                authError ? "border-red-200 focus:ring-red-500/10" : "border-zinc-100 focus:ring-zinc-900/10"
+              }`}
             />
           </div>
-          <button 
+          <button
             onClick={() => setIsPasswordSet(true)}
             className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-medium hover:bg-zinc-800 transition-all shadow-lg shadow-zinc-200"
           >
-            Enter Room
+            {authError ? "Try Again" : "Enter Room"}
+          </button>
+          <button
+            onClick={handleLeave}
+            className="w-full py-4 bg-white text-zinc-500 rounded-2xl font-medium hover:bg-zinc-50 hover:text-zinc-900 transition-all border border-zinc-100"
+          >
+            Leave
           </button>
           <p className="text-[10px] text-center text-zinc-400 uppercase tracking-widest">
             Encryption keys are derived locally
@@ -186,7 +224,7 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
             <h1 className="text-2xl font-display font-bold text-zinc-900 tracking-tight">DropSync</h1>
             <div className="flex items-center gap-2">
               <p className="text-zinc-400 text-xs font-medium uppercase tracking-widest">Secure Transfer</p>
-              {password && (
+              {effectivePassword && (
                 <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-md text-[9px] font-bold uppercase tracking-wider border border-emerald-100">
                   <Shield className="w-2.5 h-2.5" />
                   E2EE
@@ -222,12 +260,31 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
               )}
             </div>
           )}
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold uppercase tracking-widest ${
-            isConnected ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-zinc-100 text-zinc-500 border border-zinc-200"
-          }`}>
-            <div className={`w-2 h-2 rounded-full ${isConnected ? "bg-emerald-500 animate-pulse" : "bg-zinc-300"}`} />
-            {isConnected ? "Connected" : "Waiting"}
-          </div>
+          {authError ? (
+            <div className="flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold uppercase tracking-widest bg-red-50 text-red-700 border border-red-200">
+              <AlertCircle className="w-3.5 h-3.5" />
+              {authError}
+            </div>
+          ) : (
+            <div className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold uppercase tracking-widest ${
+              isConnected ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-zinc-100 text-zinc-500 border border-zinc-200"
+            }`}>
+              <div className={`w-2 h-2 rounded-full shrink-0 ${isConnected ? "bg-emerald-500 animate-pulse" : "bg-zinc-300"}`} />
+              {isConnected ? (
+                <span className="flex items-center gap-2">
+                  <span>1 peer</span>
+                  {(peerIp || peerId) && (
+                    <>
+                      <span className="opacity-40">·</span>
+                      <span className="font-mono normal-case tracking-normal opacity-70">
+                        {peerIp ?? peerId!.slice(0, 8)}
+                      </span>
+                    </>
+                  )}
+                </span>
+              ) : "Waiting"}
+            </div>
+          )}
           <button 
             onClick={inspectConnection}
             className="p-2 hover:bg-zinc-100 rounded-2xl text-zinc-400 hover:text-zinc-900 transition-all"
@@ -303,34 +360,22 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
               )}
             </AnimatePresence>
 
-            <div className="pt-6 border-t border-zinc-100 grid grid-cols-2 gap-4">
+            <div className="pt-6 border-t border-zinc-100 grid grid-cols-2 gap-x-4 gap-y-4">
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Protocol</p>
                 <p className="text-xs font-medium text-zinc-900">WebRTC P2P</p>
               </div>
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Encryption</p>
-                <p className="text-xs font-medium text-zinc-900">{password ? "AES-GCM 256" : "None"}</p>
+                <p className="text-xs font-medium text-zinc-900">{effectivePassword ? "AES-GCM 256" : "None"}</p>
               </div>
-            </div>
-          </div>
-
-          {/* Transfer History / Stats Placeholder */}
-          <div className="glass p-8 rounded-[2.5rem] bg-zinc-900 text-white border-none overflow-hidden relative">
-            <div className="absolute top-0 right-0 p-4 opacity-10">
-              <Zap className="w-24 h-24" />
-            </div>
-            <div className="relative z-10 space-y-4">
-              <h3 className="text-sm font-bold uppercase tracking-widest opacity-60">Session Stats</h3>
-              <div className="grid grid-cols-2 gap-8">
-                <div>
-                  <p className="text-3xl font-display font-bold">{stats.sent}</p>
-                  <p className="text-[10px] font-bold uppercase tracking-wider opacity-40">Files Sent</p>
-                </div>
-                <div>
-                  <p className="text-3xl font-display font-bold">{stats.received}</p>
-                  <p className="text-[10px] font-bold uppercase tracking-wider opacity-40">Received</p>
-                </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Sent</p>
+                <p className="text-xs font-medium text-zinc-900">{stats.sent} file{stats.sent !== 1 ? "s" : ""}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Received</p>
+                <p className="text-xs font-medium text-zinc-900">{stats.received} file{stats.received !== 1 ? "s" : ""}</p>
               </div>
             </div>
           </div>
@@ -353,13 +398,13 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
                 </div>
               ) : (
                 history.map((item: any, idx) => (
-                  <motion.div 
+                  <motion.div
                     key={idx}
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="flex items-center justify-between p-3 bg-zinc-50/50 rounded-xl border border-zinc-100/50"
+                    className="flex items-center justify-between p-3 bg-zinc-50/50 rounded-xl border border-zinc-100/50 gap-2"
                   >
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className={`shrink-0 p-1.5 rounded-lg ${
                         item.direction === "send" ? "bg-blue-50 text-blue-500" : "bg-purple-50 text-purple-500"
                       }`}>
@@ -372,16 +417,82 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
                         </p>
                       </div>
                     </div>
-                    <div className={`px-2 py-0.5 rounded-md text-[8px] font-bold uppercase tracking-wider border ${
-                      item.status === "completed" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
-                      item.status === "cancelled" ? "bg-amber-50 text-amber-600 border-amber-100" :
-                      "bg-red-50 text-red-600 border-red-100"
-                    }`}>
-                      {item.status}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {item.direction === "send" && item.file && isConnected && (
+                        <button
+                          onClick={() => sendFiles([item.file])}
+                          className="p-1.5 hover:bg-zinc-100 rounded-lg text-zinc-400 hover:text-zinc-700 transition-colors"
+                          title="Resend"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                        </button>
+                      )}
+                      <div className={`px-2 py-0.5 rounded-md text-[8px] font-bold uppercase tracking-wider border ${
+                        item.status === "completed" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                        item.status === "cancelled" ? "bg-amber-50 text-amber-600 border-amber-100" :
+                        "bg-red-50 text-red-600 border-red-100"
+                      }`}>
+                        {item.status}
+                      </div>
                     </div>
                   </motion.div>
                 ))
               )}
+            </div>
+          </div>
+
+          {/* Chat */}
+          <div className="glass p-8 rounded-[2.5rem] space-y-4">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-zinc-400" />
+              <h3 className="text-sm font-bold text-zinc-900 uppercase tracking-widest">Chat</h3>
+            </div>
+
+            <div className="h-56 overflow-y-auto space-y-2 pr-1">
+              {chatMessages.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center gap-2">
+                  <MessageSquare className="w-8 h-8 text-zinc-100" />
+                  <p className="text-xs text-zinc-400 font-medium">No messages yet</p>
+                </div>
+              ) : (
+                chatMessages.map((msg: ChatMessage) => (
+                  <div
+                    key={msg.id}
+                    className={`flex ${msg.from === "me" ? "justify-end" : "justify-start"}`}
+                  >
+                    <div className={`max-w-[80%] px-3.5 py-2 rounded-2xl text-sm leading-snug break-words ${
+                      msg.from === "me"
+                        ? "bg-zinc-900 text-white rounded-br-sm"
+                        : "bg-zinc-100 text-zinc-900 rounded-bl-sm"
+                    }`}>
+                      {msg.text}
+                      <span className={`block text-[9px] mt-0.5 ${msg.from === "me" ? "text-zinc-400" : "text-zinc-400"}`}>
+                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <input
+                type="text"
+                placeholder={isConnected ? "Type a message..." : "Connect to chat"}
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSendChat()}
+                disabled={!isConnected}
+                className="flex-1 px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              />
+              <button
+                onClick={handleSendChat}
+                disabled={!isConnected || !chatInput.trim()}
+                className="p-3 bg-zinc-900 text-white rounded-2xl hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                <Send className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
@@ -444,6 +555,60 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
               </p>
             </div>
           </div>
+
+          {/* Incoming File Requests */}
+          <AnimatePresence>
+            {Object.values(pendingFiles).length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 16 }}
+                className="space-y-3"
+              >
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-1">
+                  Incoming Files
+                </p>
+                {Object.values(pendingFiles).map((pf) => (
+                  <motion.div
+                    key={pf.id}
+                    initial={{ opacity: 0, scale: 0.97 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.97 }}
+                    className="glass p-5 rounded-[2rem] border-2 border-zinc-900/10 bg-zinc-50/60"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="p-2.5 rounded-xl bg-purple-50 text-purple-500 shrink-0">
+                        {React.cloneElement(getFileIcon(pf.name) as React.ReactElement, { className: "w-5 h-5" })}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-zinc-900 truncate">{pf.name}</p>
+                        <p className="text-[10px] font-medium text-zinc-400 uppercase tracking-widest">
+                          {(pf.size / (1024 * 1024)).toFixed(2)} MB · Peer wants to send this file
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => declineFile(pf.id)}
+                          className="p-2 hover:bg-red-50 rounded-xl text-zinc-400 hover:text-red-500 transition-colors"
+                          title="Decline"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => acceptFile(pf.id)}
+                          className="flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white rounded-xl text-xs font-bold hover:bg-zinc-700 transition-colors"
+                          title="Accept & Download"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          Accept
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Progress Section */}
           <div className="space-y-4">
