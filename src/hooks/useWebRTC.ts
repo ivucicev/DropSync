@@ -5,36 +5,84 @@ import { encryptChunk, decryptChunk } from "../utils/crypto";
 const CHUNK_SIZE = 16384; // 16KB chunks
 
 export interface FileTransferProgress {
+  id: string;
   name: string;
   size: number;
   progress: number;
   status: "sending" | "receiving" | "completed" | "error" | "cancelled";
   direction: "send" | "receive";
   error?: string;
+  file?: File; // Store file reference for retries
 }
 
 export function useWebRTC(roomId: string, password?: string) {
   const [peerId, setPeerId] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [latency, setLatency] = useState<number | null>(null);
-  const [transferProgress, setTransferProgress] = useState<FileTransferProgress | null>(null);
+  const [transfers, setTransfers] = useState<Record<string, FileTransferProgress>>({});
   
   const pcRef = useRef<RTCPeerConnection | null>(null);
-  const dcRef = useRef<RTCDataChannel | null>(null);
-  const receivedChunksRef = useRef<Uint8Array[]>([]);
-  const currentFileRef = useRef<{ name: string; size: number } | null>(null);
-  const cancelRef = useRef<boolean>(false);
-  const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
+  const activeChannelsRef = useRef<Record<string, RTCDataChannel>>({});
+  const transferStatesRef = useRef<Record<string, { 
+    receivedChunks: Uint8Array[], 
+    currentFile?: { name: string, size: number },
+    reader?: ReadableStreamDefaultReader<Uint8Array>,
+    cancelled: boolean
+  }>>({});
 
-  const cancelTransfer = useCallback(() => {
-    cancelRef.current = true;
-    if (readerRef.current) {
-      readerRef.current.cancel();
+  const leaveRoom = useCallback(() => {
+    if (pcRef.current) {
+      pcRef.current.close();
+      pcRef.current = null;
     }
-    if (dcRef.current && dcRef.current.readyState === "open") {
-      dcRef.current.send(JSON.stringify({ type: "transfer-cancelled" }));
+    Object.values(activeChannelsRef.current).forEach((dc: RTCDataChannel) => dc.close());
+    activeChannelsRef.current = {};
+    
+    socket.emit("leave-room", roomId);
+    setIsConnected(false);
+    setPeerId(null);
+    setTransfers({});
+    setLatency(null);
+  }, [roomId]);
+
+  const cancelTransfer = useCallback((id: string) => {
+    const state = transferStatesRef.current[id];
+    if (state) {
+      state.cancelled = true;
+      if (state.reader) {
+        state.reader.cancel();
+      }
     }
-    setTransferProgress((prev) => prev ? { ...prev, status: "cancelled" } : null);
+    
+    const dc = activeChannelsRef.current[id];
+    if (dc && dc.readyState === "open") {
+      dc.send(JSON.stringify({ type: "transfer-cancelled" }));
+    }
+    
+    setTransfers((prev) => {
+      if (!prev[id]) return prev;
+      return {
+        ...prev,
+        [id]: { ...prev[id], status: "cancelled" }
+      };
+    });
+  }, []);
+
+  const inspectConnection = useCallback(() => {
+    const stats = {
+      pcState: pcRef.current?.connectionState,
+      signalingState: pcRef.current?.signalingState,
+      iceConnectionState: pcRef.current?.iceConnectionState,
+      activeChannels: Object.entries(activeChannelsRef.current).map(([id, dc]: [string, RTCDataChannel]) => ({
+        id,
+        label: dc.label,
+        readyState: dc.readyState,
+        bufferedAmount: dc.bufferedAmount,
+        bufferedAmountLowThreshold: dc.bufferedAmountLowThreshold
+      }))
+    };
+    console.log("WebRTC Connection Inspection:", stats);
+    return stats;
   }, []);
 
   const createPeerConnection = useCallback((remoteId: string, isInitiator: boolean) => {
@@ -57,10 +105,13 @@ export function useWebRTC(roomId: string, password?: string) {
     };
 
     if (isInitiator) {
-      const dc = pc.createDataChannel("fileTransfer");
-      dc.bufferedAmountLowThreshold = 65536; // 64KB
-      setupDataChannel(dc);
-      dcRef.current = dc;
+      // We don't create a default data channel here anymore, 
+      // we create them per file transfer.
+      // But we need at least one to trigger the connection if no files are sent yet?
+      // Actually, WebRTC needs an offer/answer exchange. 
+      // Let's create a signaling channel.
+      const sigDc = pc.createDataChannel("signaling");
+      setupSignalingChannel(sigDc);
 
       pc.createOffer().then((offer) => {
         pc.setLocalDescription(offer);
@@ -73,9 +124,13 @@ export function useWebRTC(roomId: string, password?: string) {
     } else {
       pc.ondatachannel = (event) => {
         const dc = event.channel;
-        dc.bufferedAmountLowThreshold = 65536; // 64KB
-        setupDataChannel(dc);
-        dcRef.current = dc;
+        if (dc.label === "signaling") {
+          setupSignalingChannel(dc);
+        } else if (dc.label.startsWith("file-")) {
+          const id = dc.label.replace("file-", "");
+          dc.bufferedAmountLowThreshold = 65536;
+          setupFileDataChannel(dc, id);
+        }
       };
     }
 
@@ -83,78 +138,115 @@ export function useWebRTC(roomId: string, password?: string) {
     setPeerId(remoteId);
   }, [password]);
 
-  const setupDataChannel = (dc: RTCDataChannel) => {
-    dc.onopen = () => console.log("Data channel opened");
+  const setupSignalingChannel = (dc: RTCDataChannel) => {
+    dc.onopen = () => console.log("Signaling channel opened");
+    dc.onclose = () => console.log("Signaling channel closed");
+  };
+
+  const setupFileDataChannel = (dc: RTCDataChannel, id: string) => {
+    activeChannelsRef.current[id] = dc;
+    if (!transferStatesRef.current[id]) {
+      transferStatesRef.current[id] = { receivedChunks: [], cancelled: false, reader: undefined, currentFile: undefined };
+    }
+
+    dc.onopen = () => console.log(`File channel ${id} opened`);
     dc.onclose = () => {
-      console.log("Data channel closed");
-      setTransferProgress((prev) => {
-        if (prev && (prev.status === "sending" || prev.status === "receiving")) {
-          return { ...prev, status: "error", error: "Connection lost during transfer" };
+      console.log(`File channel ${id} closed`);
+      setTransfers((prev) => {
+        const t = prev[id];
+        if (t && (t.status === "sending" || t.status === "receiving")) {
+          return { ...prev, [id]: { ...t, status: "error", error: "Connection lost" } };
         }
         return prev;
       });
+      delete activeChannelsRef.current[id];
     };
-    dc.onerror = (error) => {
-      console.error("Data channel error:", error);
-      setTransferProgress((prev) => prev ? { ...prev, status: "error", error: "Data channel error occurred" } : null);
+
+    dc.onerror = (event: any) => {
+      if (event.error?.message?.includes("Close called") || event.error?.name === "OperationError") return;
+      console.error(`File channel ${id} error:`, event);
+      setTransfers((prev) => {
+        const t = prev[id];
+        if (!t) return prev;
+        return { ...prev, [id]: { ...t, status: "error", error: "Data channel error" } };
+      });
     };
+
     dc.onmessage = async (event) => {
+      const state = transferStatesRef.current[id];
+      if (!state) return;
+
       try {
         if (typeof event.data === "string") {
           const message = JSON.parse(event.data);
           if (message.type === "file-start") {
-            currentFileRef.current = { name: message.name, size: message.size };
-            receivedChunksRef.current = [];
-            setTransferProgress({
-              name: message.name,
-              size: message.size,
-              progress: 0,
-              status: "receiving",
-              direction: "receive",
-            });
+            state.currentFile = { name: message.name, size: message.size };
+            state.receivedChunks = [];
+            setTransfers((prev) => ({
+              ...prev,
+              [id]: {
+                id,
+                name: message.name,
+                size: message.size,
+                progress: 0,
+                status: "receiving",
+                direction: "receive",
+              }
+            }));
           } else if (message.type === "file-end") {
-            const blob = new Blob(receivedChunksRef.current);
+            const blob = new Blob(state.receivedChunks);
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = currentFileRef.current?.name || "download";
+            a.download = state.currentFile?.name || "download";
             a.click();
             URL.revokeObjectURL(url);
             
-            setTransferProgress((prev) => prev ? { ...prev, progress: 100, status: "completed" } : null);
+            setTransfers((prev) => {
+              const t = prev[id];
+              if (!t) return prev;
+              return { ...prev, [id]: { ...t, progress: 100, status: "completed" } };
+            });
+            dc.close();
           } else if (message.type === "transfer-cancelled") {
-            setTransferProgress((prev) => prev ? { ...prev, status: "cancelled", error: "Transfer cancelled by peer" } : null);
-            receivedChunksRef.current = [];
-            if (readerRef.current) {
-              readerRef.current.cancel();
-            }
+            setTransfers((prev) => {
+              const t = prev[id];
+              if (!t) return prev;
+              return { ...prev, [id]: { ...t, status: "cancelled", error: "Cancelled by peer" } };
+            });
+            state.receivedChunks = [];
+            if (state.reader) state.reader.cancel();
+            dc.close();
           }
         } else {
-          // Binary data (chunk)
           let chunk = new Uint8Array(event.data);
-          
           if (password) {
             try {
               chunk = await decryptChunk(chunk, password);
             } catch (e) {
-              throw new Error("Decryption failed. Incorrect password?");
+              throw new Error("Decryption failed");
             }
           }
 
-          receivedChunksRef.current.push(chunk);
-          const receivedSize = receivedChunksRef.current.reduce((acc, c) => acc + c.length, 0);
+          state.receivedChunks.push(chunk);
+          const receivedSize = state.receivedChunks.reduce((acc, c) => acc + c.length, 0);
           
-          setTransferProgress((prev) => {
-            if (!prev) return null;
+          setTransfers((prev) => {
+            const t = prev[id];
+            if (!t) return prev;
             return {
               ...prev,
-              progress: Math.round((receivedSize / prev.size) * 100),
+              [id]: { ...t, progress: Math.round((receivedSize / t.size) * 100) }
             };
           });
         }
       } catch (err) {
-        console.error("Error processing message:", err);
-        setTransferProgress((prev) => prev ? { ...prev, status: "error", error: err instanceof Error ? err.message : "Failed to process incoming data" } : null);
+        console.error(`Error on channel ${id}:`, err);
+        setTransfers((prev) => {
+          const t = prev[id];
+          if (!t) return prev;
+          return { ...prev, [id]: { ...t, status: "error", error: "Processing error" } };
+        });
       }
     };
   };
@@ -164,6 +256,18 @@ export function useWebRTC(roomId: string, password?: string) {
 
     socket.on("user-joined", (remoteId) => {
       createPeerConnection(remoteId, true);
+    });
+
+    socket.on("user-left", () => {
+      setIsConnected(false);
+      setPeerId(null);
+      setLatency(null);
+      if (pcRef.current) {
+        pcRef.current.close();
+        pcRef.current = null;
+      }
+      Object.values(activeChannelsRef.current).forEach((dc: RTCDataChannel) => dc.close());
+      activeChannelsRef.current = {};
     });
 
     socket.on("signal", async ({ from, signal }) => {
@@ -206,6 +310,7 @@ export function useWebRTC(roomId: string, password?: string) {
 
     return () => {
       socket.off("user-joined");
+      socket.off("user-left");
       socket.off("signal");
       pcRef.current?.close();
     };
@@ -233,60 +338,58 @@ export function useWebRTC(roomId: string, password?: string) {
     return () => clearInterval(interval);
   }, [isConnected]);
 
-  const sendSingleFile = async (file: File) => {
-    if (!dcRef.current || dcRef.current.readyState !== "open") {
-      setTransferProgress({
-        name: file.name,
-        size: file.size,
-        progress: 0,
-        status: "error",
-        error: "No peer connected or connection not ready",
-      });
+  const sendSingleFile = async (file: File, existingId?: string) => {
+    if (!pcRef.current || pcRef.current.connectionState !== "connected") {
+      const id = existingId || Math.random().toString(36).substring(7);
+      setTransfers(prev => ({
+        ...prev,
+        [id]: { id, name: file.name, size: file.size, progress: 0, status: "error", direction: "send", error: "Not connected", file }
+      }));
       return;
     }
 
-    const dc = dcRef.current;
-    cancelRef.current = false;
+    const id = existingId || Math.random().toString(36).substring(7);
+    const dc = pcRef.current.createDataChannel(`file-${id}`);
+    dc.bufferedAmountLowThreshold = 65536;
+    setupFileDataChannel(dc, id);
+
+    const state = transferStatesRef.current[id] = { receivedChunks: [], cancelled: false, reader: undefined, currentFile: undefined };
     
+    setTransfers(prev => ({
+      ...prev,
+      [id]: { id, name: file.name, size: file.size, progress: 0, status: "sending", direction: "send", file }
+    }));
+
+    // Wait for channel to open
+    if (dc.readyState !== "open") {
+      await new Promise((resolve, reject) => {
+        dc.onopen = () => resolve(null);
+        setTimeout(() => reject(new Error("Channel open timeout")), 5000);
+      });
+    }
+
     try {
-      // Send file metadata
-      if (dc.readyState !== "open") throw new Error("Connection not ready");
       dc.send(JSON.stringify({ type: "file-start", name: file.name, size: file.size }));
 
-      setTransferProgress({
-        name: file.name,
-        size: file.size,
-        progress: 0,
-        status: "sending",
-        direction: "send",
-      });
-
       const reader = file.stream().getReader();
-      readerRef.current = reader;
+      state.reader = reader;
       let sentSize = 0;
 
       while (true) {
-        if (cancelRef.current) {
-          throw new Error("Transfer cancelled");
-        }
+        if (state.cancelled) throw new Error("Cancelled");
         const { done, value } = await reader.read();
         if (done) break;
 
-        // Split value into smaller chunks if necessary (WebRTC has limits)
         for (let i = 0; i < value.length; i += CHUNK_SIZE) {
           let chunk = value.slice(i, i + CHUNK_SIZE);
-          
-          if (password) {
-            chunk = await encryptChunk(chunk, password);
-          }
+          if (password) chunk = await encryptChunk(chunk, password);
 
-          // Wait for buffer to clear if it's getting full
           if (dc.bufferedAmount > dc.bufferedAmountLowThreshold) {
             await new Promise((resolve, reject) => {
               const timeout = setTimeout(() => {
                 dc.onbufferedamountlow = null;
                 reject(new Error("Buffer timeout"));
-              }, 30000); // Increase to 30s
+              }, 30000);
               dc.onbufferedamountlow = () => {
                 clearTimeout(timeout);
                 dc.onbufferedamountlow = null;
@@ -295,53 +398,59 @@ export function useWebRTC(roomId: string, password?: string) {
             });
           }
           
-          if (dc.readyState !== "open") {
-            throw new Error("Connection closed during transfer");
-          }
-
+          if (dc.readyState !== "open") throw new Error("Connection closed");
           dc.send(chunk);
-          sentSize += (value.length - i < CHUNK_SIZE) ? value.length - i : CHUNK_SIZE; // Use original size for progress
+          sentSize += (value.length - i < CHUNK_SIZE) ? value.length - i : CHUNK_SIZE;
           
-          setTransferProgress((prev) => {
-            if (!prev) return null;
-            return {
-              ...prev,
-              progress: Math.round((sentSize / prev.size) * 100),
-            };
+          setTransfers((prev) => {
+            const t = prev[id];
+            if (!t) return prev;
+            return { ...prev, [id]: { ...t, progress: Math.round((sentSize / t.size) * 100) } };
           });
         }
       }
 
-      if (dc.readyState === "open") {
-        dc.send(JSON.stringify({ type: "file-end" }));
-      }
-      setTransferProgress((prev) => prev ? { ...prev, progress: 100, status: "completed" } : null);
+      if (dc.readyState === "open") dc.send(JSON.stringify({ type: "file-end" }));
+      setTransfers((prev) => {
+        const t = prev[id];
+        if (!t) return prev;
+        return { ...prev, [id]: { ...t, progress: 100, status: "completed" } };
+      });
+      setTimeout(() => dc.close(), 1000);
     } catch (err) {
-      if (cancelRef.current) {
-        setTransferProgress((prev) => prev ? { ...prev, status: "cancelled" } : null);
-      } else {
-        console.error("Send file error:", err);
-        setTransferProgress((prev) => ({
-          name: file.name,
-          size: file.size,
-          progress: prev?.progress || 0,
-          status: "error",
-          error: err instanceof Error ? err.message : "Failed to send file",
-        }));
-      }
+      console.error(`Send error ${id}:`, err);
+      setTransfers((prev) => {
+        const t = prev[id];
+        if (!t) return prev;
+        return { ...prev, [id]: { ...t, status: state.cancelled ? "cancelled" : "error", error: err instanceof Error ? err.message : "Send failed" } };
+      });
     } finally {
-      readerRef.current = null;
+      state.reader = undefined;
     }
   };
 
   const sendFiles = async (files: FileList | File[]) => {
-    for (const file of Array.from(files)) {
-      await sendSingleFile(file);
-      // Small delay between files to ensure state updates and message ordering
-      await new Promise(resolve => setTimeout(resolve, 500));
+    // Start all transfers in parallel
+    Array.from(files).forEach(file => sendSingleFile(file));
+  };
+
+  const retryTransfer = (id: string) => {
+    const t = transfers[id];
+    if (t && t.file && t.status === "error") {
+      sendSingleFile(t.file, id);
     }
   };
 
-  return { isConnected, peerId, sendFiles, transferProgress, latency, cancelTransfer };
+  return { 
+    isConnected, 
+    peerId, 
+    sendFiles, 
+    transfers, 
+    latency, 
+    cancelTransfer, 
+    leaveRoom, 
+    retryTransfer,
+    inspectConnection
+  };
 }
 

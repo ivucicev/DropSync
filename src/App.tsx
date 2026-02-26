@@ -21,10 +21,16 @@ export default function App() {
     window.history.pushState({}, "", `?room=${newId}`);
   };
 
+  const handleLeave = () => {
+    setRoomId(null);
+    setPassword("");
+    window.history.pushState({}, "", "/");
+  };
+
   if (roomId) {
     return (
       <div className="min-h-screen bg-zinc-50 py-12 px-4">
-        <FileShare roomId={roomId} initialPassword={password} />
+        <FileShare roomId={roomId} initialPassword={password} onLeave={handleLeave} />
       </div>
     );
   }

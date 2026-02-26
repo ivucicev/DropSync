@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useWebRTC } from "../hooks/useWebRTC";
+import { useWebRTC, FileTransferProgress } from "../hooks/useWebRTC";
 import { 
   FileUp, 
   Share2, 
@@ -28,7 +28,9 @@ import {
   Clock,
   QrCode,
   ArrowUpRight,
-  ArrowDownLeft
+  ArrowDownLeft,
+  RotateCcw,
+  Search
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { QRCodeSVG } from "qrcode.react";
@@ -47,12 +49,22 @@ const getFileIcon = (fileName: string) => {
 interface FileShareProps {
   roomId: string;
   initialPassword?: string;
+  onLeave?: () => void;
 }
 
-export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword }) => {
+export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, onLeave }) => {
   const [password, setPassword] = useState(initialPassword || "");
   const [isPasswordSet, setIsPasswordSet] = useState(!!initialPassword);
-  const { isConnected, sendFiles, transferProgress, latency, cancelTransfer } = useWebRTC(roomId, isPasswordSet ? password : undefined);
+  const { 
+    isConnected, 
+    sendFiles, 
+    transfers, 
+    latency, 
+    cancelTransfer, 
+    leaveRoom, 
+    retryTransfer,
+    inspectConnection 
+  } = useWebRTC(roomId, isPasswordSet ? password : undefined);
   const [isDragging, setIsDragging] = useState(false);
   const [showError, setShowError] = useState(false);
   const [stats, setStats] = useState({ sent: 0, received: 0 });
@@ -69,31 +81,32 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword })
   }, [notification]);
 
   useEffect(() => {
-    if (transferProgress?.status === "error") {
-      setShowError(true);
-    }
-    
-    if (transferProgress && ["completed", "error", "cancelled"].includes(transferProgress.status)) {
-      // Add to history if not already there (to avoid duplicates from re-renders)
-      setHistory(prev => {
-        const lastItem = prev[0];
-        if (lastItem && lastItem.name === transferProgress.name && lastItem.status === transferProgress.status && Math.abs(lastItem.timestamp - Date.now()) < 1000) {
-          return prev;
-        }
-        return [{
-          ...transferProgress,
-          timestamp: Date.now()
-        }, ...prev].slice(0, 10); // Keep last 10
-      });
-
-      if (transferProgress.status === "completed") {
-        setStats(prev => ({
-          sent: transferProgress.status === "sending" ? prev.sent + 1 : prev.sent,
-          received: transferProgress.status === "receiving" ? prev.received + 1 : prev.received
-        }));
+    (Object.values(transfers) as FileTransferProgress[]).forEach(transfer => {
+      if (transfer.status === "error") {
+        setShowError(true);
       }
-    }
-  }, [transferProgress?.status]);
+      
+      if (["completed", "error", "cancelled"].includes(transfer.status)) {
+        // Add to history if not already there
+        setHistory(prev => {
+          const exists = prev.some(h => h.id === transfer.id && h.status === transfer.status);
+          if (exists) return prev;
+          
+          return [{
+            ...transfer,
+            timestamp: Date.now()
+          }, ...prev].slice(0, 10);
+        });
+
+        if (transfer.status === "completed") {
+          setStats(prev => ({
+            sent: transfer.direction === "send" ? prev.sent + 1 : prev.sent,
+            received: transfer.direction === "receive" ? prev.received + 1 : prev.received
+          }));
+        }
+      }
+    });
+  }, [transfers]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -116,6 +129,11 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword })
   const copyRoomLink = () => {
     const url = `${window.location.origin}/?room=${roomId}`;
     navigator.clipboard.writeText(url);
+  };
+
+  const handleLeave = () => {
+    leaveRoom();
+    if (onLeave) onLeave();
   };
 
   if (!isPasswordSet && !initialPassword) {
@@ -210,6 +228,20 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword })
             <div className={`w-2 h-2 rounded-full ${isConnected ? "bg-emerald-500 animate-pulse" : "bg-zinc-300"}`} />
             {isConnected ? "Connected" : "Waiting"}
           </div>
+          <button 
+            onClick={inspectConnection}
+            className="p-2 hover:bg-zinc-100 rounded-2xl text-zinc-400 hover:text-zinc-900 transition-all"
+            title="Inspect Connection"
+          >
+            <Search className="w-5 h-5" />
+          </button>
+          <button 
+            onClick={handleLeave}
+            className="p-2 hover:bg-zinc-100 rounded-2xl text-zinc-400 hover:text-red-500 transition-all"
+            title="Leave Room"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
       </div>
 
@@ -320,7 +352,7 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword })
                   <p className="text-xs text-zinc-400 font-medium">No recent transfers</p>
                 </div>
               ) : (
-                history.map((item, idx) => (
+                history.map((item: any, idx) => (
                   <motion.div 
                     key={idx}
                     initial={{ opacity: 0, x: -10 }}
@@ -414,112 +446,118 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword })
           </div>
 
           {/* Progress Section */}
-          <AnimatePresence>
-            {transferProgress && (
-              <motion.div
-                initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className={`glass p-8 rounded-[2.5rem] ${
-                  transferProgress.status === "error" ? "border-red-100 bg-red-50/30" : ""
-                }`}
-              >
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-2xl relative ${
-                      transferProgress.status === "error" ? "bg-red-50" : 
-                      transferProgress.status === "cancelled" ? "bg-amber-50" :
-                      "bg-zinc-900 shadow-lg shadow-zinc-200"
-                    }`}>
-                      <div className={
-                        transferProgress.status === "error" ? "text-red-600" : 
-                        transferProgress.status === "cancelled" ? "text-amber-600" :
-                        "text-white"
-                      }>
-                        {getFileIcon(transferProgress.name)}
+          <div className="space-y-4">
+            <AnimatePresence>
+              {(Object.values(transfers) as FileTransferProgress[])
+                .filter(t => ["sending", "receiving", "error", "cancelled"].includes(t.status))
+                .map((t) => (
+                  <motion.div
+                    key={t.id}
+                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className={`glass p-6 rounded-[2rem] ${
+                      t.status === "error" ? "border-red-100 bg-red-50/30" : ""
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-4">
+                        <div className={`p-2.5 rounded-xl relative ${
+                          t.status === "error" ? "bg-red-50" : 
+                          t.status === "cancelled" ? "bg-amber-50" :
+                          "bg-zinc-900 shadow-md shadow-zinc-200"
+                        }`}>
+                          <div className={
+                            t.status === "error" ? "text-red-600" : 
+                            t.status === "cancelled" ? "text-amber-600" :
+                            "text-white"
+                          }>
+                            {React.cloneElement(getFileIcon(t.name) as React.ReactElement, { className: "w-5 h-5" })}
+                          </div>
+                          <div className={`absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center ${
+                            t.direction === "send" ? "bg-blue-500" : "bg-purple-500"
+                          }`}>
+                            {t.direction === "send" ? <ArrowUpRight className="w-2 h-2 text-white" /> : <ArrowDownLeft className="w-2 h-2 text-white" />}
+                          </div>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-zinc-900 truncate max-w-[180px]">
+                            {t.name}
+                          </p>
+                          <p className={`text-[10px] font-medium uppercase tracking-widest ${
+                            t.status === "error" ? "text-red-500" : 
+                            t.status === "cancelled" ? "text-amber-500" :
+                            "text-zinc-400"
+                          }`}>
+                            {(t.size / (1024 * 1024)).toFixed(2)} MB • {t.status}
+                          </p>
+                        </div>
                       </div>
-                      {/* Direction Badge */}
-                      <div className={`absolute -top-1 -right-1 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center ${
-                        transferProgress.direction === "send" ? "bg-blue-500" : "bg-purple-500"
-                      }`}>
-                        {transferProgress.direction === "send" ? <ArrowUpRight className="w-2.5 h-2.5 text-white" /> : <ArrowDownLeft className="w-2.5 h-2.5 text-white" />}
+                      <div className="flex items-center gap-2">
+                        {t.status === "error" && (
+                          <button 
+                            onClick={() => retryTransfer(t.id)}
+                            className="p-2 hover:bg-red-100 rounded-full text-red-500 transition-colors"
+                            title="Retry Transfer"
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                          </button>
+                        )}
+                        {(t.status === "sending" || t.status === "receiving") && (
+                          <button 
+                            onClick={() => cancelTransfer(t.id)}
+                            className="p-2 hover:bg-zinc-100 rounded-full text-zinc-400 hover:text-red-500 transition-colors"
+                            title="Cancel Transfer"
+                          >
+                            <Ban className="w-4 h-4" />
+                          </button>
+                        )}
+                        {t.status === "error" ? (
+                          <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
+                            <AlertCircle className="w-5 h-5 text-white" />
+                          </div>
+                        ) : t.status === "cancelled" ? (
+                          <div className="w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center">
+                            <Ban className="w-5 h-5 text-white" />
+                          </div>
+                        ) : (
+                          <div className="w-8 h-8 bg-zinc-100 rounded-full flex items-center justify-center">
+                            <Loader2 className="w-5 h-5 text-zinc-400 animate-spin" />
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <div>
-                      <p className="text-lg font-display font-bold text-zinc-900 truncate max-w-[240px]">
-                        {transferProgress.name}
-                      </p>
-                      <p className={`text-xs font-medium uppercase tracking-widest ${
-                        transferProgress.status === "error" ? "text-red-500" : 
-                        transferProgress.status === "cancelled" ? "text-amber-500" :
-                        "text-zinc-400"
+
+                    {t.status === "error" || t.status === "cancelled" ? (
+                      <div className={`rounded-xl p-3 flex items-start gap-3 border ${
+                        t.status === "error" ? "bg-red-50/50 border-red-100" : "bg-amber-50/50 border-amber-100"
                       }`}>
-                        {(transferProgress.size / (1024 * 1024)).toFixed(2)} MB • {transferProgress.status}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {(transferProgress.status === "sending" || transferProgress.status === "receiving") && (
-                      <button 
-                        onClick={cancelTransfer}
-                        className="p-2 hover:bg-zinc-100 rounded-full text-zinc-400 hover:text-red-500 transition-colors"
-                        title="Cancel Transfer"
-                      >
-                        <Ban className="w-5 h-5" />
-                      </button>
-                    )}
-                    {transferProgress.status === "completed" ? (
-                      <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg shadow-emerald-200">
-                        <CheckCircle2 className="w-6 h-6 text-white" />
-                      </div>
-                    ) : transferProgress.status === "error" ? (
-                      <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center shadow-lg shadow-red-200">
-                        <AlertCircle className="w-6 h-6 text-white" />
-                      </div>
-                    ) : transferProgress.status === "cancelled" ? (
-                      <div className="w-10 h-10 bg-amber-500 rounded-full flex items-center justify-center shadow-lg shadow-amber-200">
-                        <Ban className="w-6 h-6 text-white" />
+                        <p className={`text-[11px] leading-relaxed font-medium ${
+                          t.status === "error" ? "text-red-700" : "text-amber-700"
+                        }`}>
+                          {t.error || (t.status === "cancelled" ? "Transfer cancelled." : "Error occurred.")}
+                        </p>
                       </div>
                     ) : (
-                      <div className="w-10 h-10 bg-zinc-100 rounded-full flex items-center justify-center">
-                        <Loader2 className="w-6 h-6 text-zinc-400 animate-spin" />
+                      <div className="space-y-2">
+                        <div className="h-2 w-full bg-zinc-100 rounded-full overflow-hidden">
+                          <motion.div 
+                            className="h-full bg-zinc-900 rounded-full"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${t.progress}%` }}
+                            transition={{ duration: 0.3 }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-[9px] font-bold text-zinc-400 uppercase tracking-widest">
+                          <span>{t.progress}%</span>
+                          <span>{t.direction === "send" ? "Uploading" : "Downloading"}</span>
+                        </div>
                       </div>
                     )}
-                  </div>
-                </div>
-
-                {transferProgress.status === "error" || transferProgress.status === "cancelled" ? (
-                  <div className={`rounded-2xl p-4 flex items-start gap-4 border ${
-                    transferProgress.status === "error" ? "bg-red-50/50 border-red-100" : "bg-amber-50/50 border-amber-100"
-                  }`}>
-                    <AlertCircle className={`w-5 h-5 mt-0.5 shrink-0 ${
-                      transferProgress.status === "error" ? "text-red-600" : "text-amber-600"
-                    }`} />
-                    <p className={`text-sm leading-relaxed font-medium ${
-                      transferProgress.status === "error" ? "text-red-700" : "text-amber-700"
-                    }`}>
-                      {transferProgress.error || (transferProgress.status === "cancelled" ? "Transfer was cancelled." : "An unexpected error occurred.")}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="h-3 w-full bg-zinc-100 rounded-full overflow-hidden p-0.5">
-                      <motion.div 
-                        className="h-full bg-zinc-900 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.1)]"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${transferProgress.progress}%` }}
-                        transition={{ duration: 0.3 }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em]">
-                      <span>{transferProgress.progress}% Completed</span>
-                      <span>{transferProgress.status === "sending" ? "Uploading" : "Downloading"}</span>
-                    </div>
-                  </div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
+                  </motion.div>
+                ))}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
 

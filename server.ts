@@ -32,6 +32,12 @@ async function startServer() {
       socket.to(roomId).emit("user-joined", socket.id);
     });
 
+    socket.on("leave-room", (roomId: string) => {
+      socket.leave(roomId);
+      console.log(`User ${socket.id} left room ${roomId}`);
+      socket.to(roomId).emit("user-left", socket.id);
+    });
+
     socket.on("signal", ({ to, from, signal }) => {
       io.to(to).emit("signal", { from, signal });
     });
