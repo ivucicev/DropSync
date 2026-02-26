@@ -9,6 +9,7 @@ export interface FileTransferProgress {
   size: number;
   progress: number;
   status: "sending" | "receiving" | "completed" | "error" | "cancelled";
+  direction: "send" | "receive";
   error?: string;
 }
 
@@ -106,6 +107,7 @@ export function useWebRTC(roomId: string, password?: string) {
               size: message.size,
               progress: 0,
               status: "receiving",
+              direction: "receive",
             });
           } else if (message.type === "file-end") {
             const blob = new Blob(receivedChunksRef.current);
@@ -236,6 +238,7 @@ export function useWebRTC(roomId: string, password?: string) {
         size: file.size,
         progress: 0,
         status: "sending",
+        direction: "send",
       });
 
       const reader = file.stream().getReader();

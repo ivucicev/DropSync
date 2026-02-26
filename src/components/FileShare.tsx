@@ -26,7 +26,9 @@ import {
   Ban,
   History,
   Clock,
-  QrCode
+  QrCode,
+  ArrowUpRight,
+  ArrowDownLeft
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { QRCodeSVG } from "qrcode.react";
@@ -326,8 +328,10 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword })
                     className="flex items-center justify-between p-3 bg-zinc-50/50 rounded-xl border border-zinc-100/50"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="text-zinc-400 shrink-0">
-                        {React.cloneElement(getFileIcon(item.name) as React.ReactElement, { className: "w-4 h-4" })}
+                      <div className={`shrink-0 p-1.5 rounded-lg ${
+                        item.direction === "send" ? "bg-blue-50 text-blue-500" : "bg-purple-50 text-purple-500"
+                      }`}>
+                        {item.direction === "send" ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownLeft className="w-3 h-3" />}
                       </div>
                       <div className="min-w-0">
                         <p className="text-xs font-bold text-zinc-900 truncate">{item.name}</p>
@@ -422,7 +426,7 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword })
               >
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-2xl ${
+                    <div className={`p-3 rounded-2xl relative ${
                       transferProgress.status === "error" ? "bg-red-50" : 
                       transferProgress.status === "cancelled" ? "bg-amber-50" :
                       "bg-zinc-900 shadow-lg shadow-zinc-200"
@@ -433,6 +437,12 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword })
                         "text-white"
                       }>
                         {getFileIcon(transferProgress.name)}
+                      </div>
+                      {/* Direction Badge */}
+                      <div className={`absolute -top-1 -right-1 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center ${
+                        transferProgress.direction === "send" ? "bg-blue-500" : "bg-purple-500"
+                      }`}>
+                        {transferProgress.direction === "send" ? <ArrowUpRight className="w-2.5 h-2.5 text-white" /> : <ArrowDownLeft className="w-2.5 h-2.5 text-white" />}
                       </div>
                     </div>
                     <div>
