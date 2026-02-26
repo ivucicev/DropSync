@@ -19,6 +19,10 @@ async function startServer() {
     // Cloudflare tunnels and most reverse proxies break HTTP long-polling.
     // WebSocket-only avoids the polling→upgrade handshake that often hangs.
     transports: ["websocket"],
+    // Ping every 10s, allow 5s for pong — keeps connections alive through
+    // Cloudflare's idle timeout and detects dead peers quickly.
+    pingInterval: 10000,
+    pingTimeout: 5000,
   });
 
   const PORT = 3000;
