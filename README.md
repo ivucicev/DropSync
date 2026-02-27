@@ -60,11 +60,28 @@ docker compose up
 
 ## How it works
 
-1. You create a room — a unique ID is added to the URL
-2. Your peer opens that URL (optionally enters the room password)
-3. Socket.IO relays the WebRTC handshake once
-4. The server is done — all data flows directly between browsers
-5. Files and chat messages are encrypted locally before sending (if a password is set)
+### Step 1 — Create a room
+
+Click **Create Secure Room** on the landing page. A unique room ID is generated and added to the URL. Optionally type a password first — this enables AES-GCM 256 end-to-end encryption for all files and chat in that room. Without a password, transfers still go directly peer-to-peer, just unencrypted.
+
+### Step 2 — Share the link
+
+Copy the room URL or scan the QR code shown on the room page. Send it however you like — message, email, show it on screen. Your peer opens it in any modern browser. If you set a password, they'll be prompted for it before connecting.
+
+### Step 3 — Drop files and receive
+
+Once your peer joins, the connection status turns green. Drag files onto the drop zone or tap to select them. Your peer gets an incoming file request and clicks Accept to download. Files go directly from your browser to theirs — no upload, no server, no cloud storage.
+
+---
+
+### Under the hood
+
+1. Both browsers connect to the signaling server (Socket.IO)
+2. WebRTC offer/answer and ICE candidates are exchanged through the server
+3. A direct peer-to-peer RTCDataChannel is established
+4. The signaling server is now completely out of the loop
+5. Files are split into 8KB chunks, optionally encrypted locally, and streamed over the data channel
+6. The receiver reassembles chunks and triggers a browser download when complete
 
 ---
 

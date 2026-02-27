@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { FileShare } from "./components/FileShare";
-import { Share2, Zap, Shield, Globe, ArrowRightLeft, CheckCircle2, Sun, Moon } from "lucide-react";
+import { Shield, Globe, ArrowRightLeft, Sun, Moon, Lock, Link, Download } from "lucide-react";
 import { motion } from "motion/react";
 
 function useDarkMode(): [boolean, () => void] {
@@ -130,73 +130,76 @@ export default function App() {
         </div>
       </div>
 
-      {/* Right Pane: Visuals */}
-      <div className="lg:w-1/2 bg-zinc-50 dark:bg-zinc-900 relative overflow-hidden flex items-center justify-center p-8 lg:p-0">
-        {/* Decorative Elements */}
-        <div className="absolute top-0 right-0 w-full h-full opacity-30">
+      {/* Right Pane: How it works */}
+      <div className="lg:w-1/2 bg-zinc-50 dark:bg-zinc-900 relative overflow-hidden flex items-center justify-center p-8 lg:p-24">
+        <div className="absolute top-0 right-0 w-full h-full opacity-20">
           <div className="absolute top-[-10%] right-[-10%] w-[60%] h-[60%] bg-zinc-200 dark:bg-zinc-700 rounded-full blur-[120px]" />
           <div className="absolute bottom-[-10%] left-[-10%] w-[60%] h-[60%] bg-zinc-200 dark:bg-zinc-700 rounded-full blur-[120px]" />
         </div>
 
-        <div className="relative z-10 grid grid-cols-2 gap-6 max-w-lg w-full">
-          <FeatureCard 
-            icon={<Zap className="w-6 h-6" />}
-            title="Zero Latency"
-            desc="Direct data streaming without intermediate servers."
-            delay={0.1}
-          />
-          <FeatureCard 
-            icon={<Shield className="w-6 h-6" />}
-            title="Total Privacy"
-            desc="Data is encrypted locally and never stored in the cloud."
-            delay={0.2}
-          />
-          <FeatureCard 
-            icon={<Globe className="w-6 h-6" />}
-            title="Universal"
-            desc="Works on any modern browser, mobile or desktop."
-            delay={0.3}
-          />
-          <FeatureCard 
-            icon={<Share2 className="w-6 h-6" />}
-            title="Limitless"
-            desc="No file size limits. Transfer GBs in seconds."
-            delay={0.4}
-          />
-        </div>
-
-        {/* Floating Badge */}
-        <motion.div
-          animate={{ y: [0, -10, 0] }}
-          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute bottom-12 right-12 glass px-6 py-4 rounded-2xl flex items-center gap-4"
-        >
-          <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg shadow-emerald-200">
-            <CheckCircle2 className="w-6 h-6 text-white" />
-          </div>
+        <div className="relative z-10 w-full max-w-md space-y-10">
           <div>
-            <p className="text-sm font-bold text-zinc-900 dark:text-white">100% Secure</p>
-            <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-bold">Verified P2P Tunnel</p>
+            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em] mb-3">How it works</p>
+            <h2 className="text-3xl font-display font-bold text-zinc-900 dark:text-white tracking-tight">Three steps.<br />That's it.</h2>
           </div>
-        </motion.div>
+
+          <div className="space-y-6">
+            <Step
+              num="01"
+              icon={<Lock className="w-5 h-5" />}
+              title="Create a room"
+              desc="Optionally set a password for end-to-end encryption. Without a password files still transfer directly — just unencrypted."
+              delay={0.1}
+            />
+            <Step
+              num="02"
+              icon={<Link className="w-5 h-5" />}
+              title="Share the link"
+              desc="Copy the room URL or scan the QR code. Send it via message, email, or show it on screen. Your peer opens it in any browser."
+              delay={0.2}
+            />
+            <Step
+              num="03"
+              icon={<Download className="w-5 h-5" />}
+              title="Drop and receive"
+              desc="Drag files onto the drop zone or tap to select. Files go directly from your device to theirs — no upload, no cloud, no waiting."
+              delay={0.3}
+            />
+          </div>
+
+          <div className="pt-2 flex items-center gap-6 text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
+            <div className="flex items-center gap-2">
+              <Globe className="w-3.5 h-3.5" />
+              Browser-to-Browser
+            </div>
+            <div className="flex items-center gap-2">
+              <Shield className="w-3.5 h-3.5" />
+              E2E Encrypted
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-function FeatureCard({ icon, title, desc, delay }: { icon: React.ReactNode, title: string, desc: string, delay: number }) {
+function Step({ num, icon, title, desc, delay }: { num: string; icon: React.ReactNode; title: string; desc: string; delay: number }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
       transition={{ delay }}
-      className="glass p-8 rounded-[2.5rem] space-y-4 hover:scale-[1.05] transition-transform duration-500 cursor-default group"
+      className="flex gap-5"
     >
-      <div className="w-12 h-12 bg-white dark:bg-zinc-700 rounded-2xl flex items-center justify-center shadow-sm group-hover:bg-zinc-900 group-hover:text-white dark:group-hover:bg-white dark:group-hover:text-zinc-900 transition-colors duration-500">
-        {icon}
+      <div className="shrink-0 flex flex-col items-center gap-2">
+        <div className="w-10 h-10 bg-zinc-900 dark:bg-white rounded-2xl flex items-center justify-center text-white dark:text-zinc-900 shadow-md shadow-zinc-200 dark:shadow-zinc-900">
+          {icon}
+        </div>
+        <div className="w-px flex-1 bg-zinc-200 dark:bg-zinc-700 min-h-[1.5rem]" />
       </div>
-      <div className="space-y-2">
-        <h3 className="font-display font-bold text-lg text-zinc-900 dark:text-white">{title}</h3>
+      <div className="pb-6">
+        <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-[0.2em] mb-1">{num}</p>
+        <h3 className="font-display font-bold text-lg text-zinc-900 dark:text-white mb-1">{title}</h3>
         <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed font-light">{desc}</p>
       </div>
     </motion.div>
