@@ -1,6 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Outfit", sans-serif;
@@ -10,9 +12,6 @@
 @layer base {
   body {
     @apply bg-zinc-50 text-zinc-900 antialiased selection:bg-zinc-900 selection:text-white;
-  }
-  .dark body {
-    @apply bg-zinc-950 text-zinc-100 selection:bg-white selection:text-zinc-900;
   }
 }
 
