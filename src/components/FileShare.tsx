@@ -303,8 +303,8 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
       </div>
 
       <div className="grid lg:grid-cols-5 gap-8">
-        {/* Left Column: Room Controls */}
-        <div className="lg:col-span-2 space-y-6">
+        {/* Right Column: Transfer Area — rendered first in DOM so it appears at top on mobile */}
+        <div className="lg:col-span-3 lg:order-2 space-y-6">
           <div className="glass p-8 rounded-[2.5rem] space-y-6">
             <div className="space-y-2">
               <h3 className="text-sm font-bold text-zinc-900 uppercase tracking-widest">Room Access</h3>
@@ -497,8 +497,8 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
           </div>
         </div>
 
-        {/* Right Column: Transfer Area */}
-        <div className="lg:col-span-3 space-y-6">
+        {/* Left Column: Room Controls */}
+        <div className="lg:col-span-2 lg:order-1 space-y-6">
           <div
             onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
             onDragLeave={() => setIsDragging(false)}
