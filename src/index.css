@@ -11,10 +11,17 @@
   body {
     @apply bg-zinc-50 text-zinc-900 antialiased selection:bg-zinc-900 selection:text-white;
   }
+  .dark body {
+    @apply bg-zinc-950 text-zinc-100 selection:bg-white selection:text-zinc-900;
+  }
 }
 
 .glass {
   @apply bg-white/70 backdrop-blur-xl border border-white/20 shadow-xl shadow-zinc-200/50;
+}
+
+.dark .glass {
+  @apply bg-zinc-800/70 backdrop-blur-xl border border-white/10 shadow-xl shadow-black/30;
 }
 
 .glass-dark {

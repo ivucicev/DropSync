@@ -84,55 +84,160 @@ docker compose up
 
 The signaling server is a tiny Node.js process — it only relays the WebRTC handshake and never touches your files. Once peers connect, the server is completely out of the loop.
 
-### STUN and TURN servers
+---
 
-WebRTC needs to find a route between two browsers. On a home network this usually works fine with just STUN (Google's free public servers are used by default). On mobile networks it often does not.
+### ⚠️ Network compatibility: what works and what doesn't
 
-**Why STUN alone fails on 5G / mobile**
+Not all networks can establish direct P2P connections. Understanding this is important before deploying DropSync for others.
 
-Most mobile carriers use carrier-grade NAT (CGNAT) — many subscribers share a single public IP. STUN can discover your public address but CGNAT blocks the direct connection attempt, so both peers wait forever for a response that never arrives.
+| Scenario | Works? | Why |
+|---|---|---|
+| Both peers on WiFi / same network | ✅ Yes | Direct LAN connection |
+| Both peers on home broadband | ✅ Usually | STUN resolves public IPs |
+| One peer on WiFi, one on 5G/mobile | ⚠️ Sometimes | Depends on carrier NAT |
+| Both peers on 5G / mobile data | ❌ Often fails | CGNAT blocks direct connections |
+| Corporate / university network | ❌ Often fails | Strict firewalls block UDP |
 
-A TURN server fixes this. When a direct path can't be established, TURN relays the data through a server that both peers can reach. The data is still encrypted end-to-end; TURN just forwards the packets.
+**The default build uses [Open Relay](https://www.metered.ca/tools/openrelay/)** — a free community TURN server — as a fallback for when direct connections fail. This helps with many mobile scenarios but Open Relay is rate-limited, not guaranteed, and not suitable for production. For reliable 5G and mobile support you need your own TURN server (see below).
 
-DropSync ships with [Open Relay](https://www.metered.ca/tools/openrelay/) configured out of the box — a free TURN service that works for most use cases. No sign-up required.
+---
 
-**Running your own TURN server**
+### Why 5G and mobile networks fail without TURN
 
-For production or high-volume use, run [Coturn](https://github.com/coturn/coturn):
+Mobile carriers use **Carrier-Grade NAT (CGNAT)** — thousands of subscribers share a single public IP address. STUN can discover your external address but the carrier's NAT blocks incoming connection attempts, so both peers wait forever for a packet that never arrives.
+
+A **TURN server** solves this by acting as a relay. When no direct path exists, both peers connect to the TURN server and it forwards packets between them. The connection is still encrypted end-to-end — TURN only sees ciphertext.
+
+Without a working TURN server:
+- WiFi-to-WiFi: works fine
+- WiFi-to-5G: unreliable
+- 5G-to-5G: will not connect
+
+---
+
+### Setting up your own TURN server (recommended for production)
+
+You need a VPS with a public static IP (Azure, DigitalOcean, Hetzner, etc.). The TURN server must be reachable from the open internet — it cannot sit behind a Cloudflare proxy or another NAT.
+
+#### 1. Install Coturn
 
 ```bash
-# Install
-apt install coturn
+sudo apt update && sudo apt install -y coturn
+```
 
-# Minimal /etc/turnserver.conf
+#### 2. Get a TLS certificate
+
+```bash
+# Using Cloudflare DNS challenge (recommended — no need to open port 80)
+sudo apt install -y python3-certbot-dns-cloudflare
+
+# Create Cloudflare API credentials
+sudo nano /etc/cloudflare.ini
+# Contents:
+#   dns_cloudflare_api_token = YOUR_CLOUDFLARE_API_TOKEN
+sudo chmod 600 /etc/cloudflare.ini
+
+sudo certbot certonly \
+  --dns-cloudflare \
+  --dns-cloudflare-credentials /etc/cloudflare.ini \
+  -d turn.yourdomain.com
+```
+
+Or use standalone if port 80 is available:
+```bash
+sudo certbot certonly --standalone -d turn.yourdomain.com
+```
+
+#### 3. Configure Coturn
+
+```bash
+sudo nano /etc/turnserver.conf
+```
+
+```conf
 listening-port=3478
 tls-listening-port=5349
 fingerprint
 lt-cred-mech
-user=dropsync:yourpassword
-realm=yourdomain.com
-cert=/path/to/cert.pem
-pkey=/path/to/key.pem
+user=dropsync:your_strong_password
+realm=turn.yourdomain.com
+cert=/etc/letsencrypt/live/turn.yourdomain.com/fullchain.pem
+pkey=/etc/letsencrypt/live/turn.yourdomain.com/privkey.pem
+min-port=49152
+max-port=65535
+
+# Required if your server has a private IP behind NAT (e.g. cloud VMs):
+# external-ip=YOUR_PUBLIC_IP/YOUR_PRIVATE_IP
+# Example: external-ip=4.231.100.10/10.0.0.4
 ```
 
-Then update the ICE config in `src/hooks/useWebRTC.ts`:
+> **Cloud VMs (Azure, AWS, GCP, etc.)** always have a private IP behind NAT. The `external-ip` line is **required** or relay candidates will advertise the wrong address and connections will fail silently.
+>
+> Find your IPs: `curl -s ifconfig.me` (public) and `hostname -I | awk '{print $1}'` (private)
 
-```typescript
-iceServers: [
-  { urls: "stun:stun.l.google.com:19302" },
-  {
-    urls: [
-      "turn:yourdomain.com:3478",
-      "turn:yourdomain.com:3478?transport=tcp",
-      "turns:yourdomain.com:5349",
-    ],
-    username: "dropsync",
-    credential: "yourpassword",
-  },
-],
+#### 4. Open firewall ports
+
+| Port | Protocol | Purpose |
+|---|---|---|
+| 3478 | UDP + TCP | STUN/TURN |
+| 5349 | TCP | TURNS (TLS) |
+| 49152–65535 | UDP | TURN relay range |
+
+On Azure: add inbound rules in **VM → Networking → Add inbound port rule**.
+
+On Linux firewall:
+```bash
+sudo ufw allow 3478/udp
+sudo ufw allow 3478/tcp
+sudo ufw allow 5349/tcp
+sudo ufw allow 49152:65535/udp
 ```
 
-Open port 3478 (UDP+TCP) and 5349 (TLS) on your firewall, plus the UDP relay range (49152–65535 by default).
+#### 5. Start Coturn
+
+```bash
+sudo systemctl enable coturn
+sudo systemctl start coturn
+sudo systemctl status coturn
+```
+
+Check logs:
+```bash
+sudo journalctl -u coturn -f
+```
+
+#### 6. Test your TURN server
+
+Use the trickle-ice tool at https://webrtc.github.io/samples/src/content/peerconnection/trickle-ice/
+
+- TURN URI: `turn:turn.yourdomain.com:3478`
+- Username: `dropsync`
+- Password: `your_strong_password`
+
+You should see a `relay` candidate appear with your server's **public** IP. If it shows a private IP (e.g. `10.x.x.x` or `172.x.x.x`), the `external-ip` line is missing or wrong.
+
+#### 7. Configure DropSync to use your TURN server
+
+Create a `.env` file in the project root (copy from `.env.example`):
+
+```env
+VITE_TURN_URL=turn.yourdomain.com
+VITE_TURN_USERNAME=dropsync
+VITE_TURN_CREDENTIAL=your_strong_password
+```
+
+Then rebuild:
+```bash
+npm run build
+# or
+docker compose up --build -d
+```
+
+> If you deploy via Coolify, Render, Railway, or similar platforms, set the environment variables in the platform's dashboard instead of a `.env` file. The values get baked into the frontend bundle at build time.
+
+If `VITE_TURN_URL` is not set, DropSync falls back to Open Relay automatically.
+
+---
 
 ### Cloudflare Tunnel
 
@@ -158,7 +263,9 @@ ingress:
   - service: http_status:404
 ```
 
-The server already sends WebSocket pings every 10 seconds to stay alive through Cloudflare's 60-second idle timeout. No changes needed there.
+The server sends WebSocket pings every 10 seconds to stay alive through Cloudflare's 60-second idle timeout. No changes needed there.
+
+> **Important:** Your TURN server must NOT go through Cloudflare Tunnel or Cloudflare proxy. TURN uses raw UDP/TCP on ports 3478 and 5349, which Cloudflare does not pass through. Point the DNS record for `turn.yourdomain.com` directly to your VPS IP with the proxy disabled (grey cloud in Cloudflare DNS settings).
 
 ---
 
@@ -172,4 +279,5 @@ src/
   services/socket.ts       Socket.IO client
   App.tsx                  Landing page and room routing
 server.ts                  Signaling server
+.env.example               Environment variable template
 ```

@@ -166,13 +166,13 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
 
   if (!isPasswordSet) {
     return (
-      <div className="max-w-md mx-auto p-8 bg-white rounded-[2.5rem] border border-zinc-100 shadow-xl shadow-zinc-200/50 space-y-8">
+      <div className="max-w-md mx-auto p-8 bg-white dark:bg-zinc-900 rounded-[2.5rem] border border-zinc-100 dark:border-zinc-800 shadow-xl shadow-zinc-200/50 dark:shadow-black/30 space-y-8">
         <div className="space-y-2 text-center">
-          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 ${authError ? "bg-red-500" : "bg-zinc-900"}`}>
-            <Shield className="w-8 h-8 text-white" />
+          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 ${authError ? "bg-red-500" : "bg-zinc-900 dark:bg-white"}`}>
+            <Shield className={`w-8 h-8 ${authError ? "text-white" : "text-white dark:text-zinc-900"}`} />
           </div>
-          <h2 className="text-2xl font-medium text-zinc-900">{authError ? "Wrong Password" : "Secure Room"}</h2>
-          <p className="text-zinc-500 text-sm leading-relaxed">
+          <h2 className="text-2xl font-medium text-zinc-900 dark:text-white">{authError ? "Wrong Password" : "Secure Room"}</h2>
+          <p className="text-zinc-500 dark:text-zinc-400 text-sm leading-relaxed">
             {authError ?? "This room may be protected. Enter the password to enable end-to-end encryption for your transfers."}
           </p>
         </div>
@@ -187,20 +187,20 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
               onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && setIsPasswordSet(true)}
               autoFocus
-              className={`w-full px-5 py-4 bg-zinc-50 border rounded-2xl focus:outline-none focus:ring-2 transition-all font-medium ${
-                authError ? "border-red-200 focus:ring-red-500/10" : "border-zinc-100 focus:ring-zinc-900/10"
+              className={`w-full px-5 py-4 bg-zinc-50 dark:bg-zinc-800 dark:text-white dark:placeholder-zinc-500 border rounded-2xl focus:outline-none focus:ring-2 transition-all font-medium ${
+                authError ? "border-red-200 focus:ring-red-500/10" : "border-zinc-100 dark:border-zinc-700 focus:ring-zinc-900/10 dark:focus:ring-white/10"
               }`}
             />
           </div>
           <button
             onClick={() => setIsPasswordSet(true)}
-            className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-medium hover:bg-zinc-800 transition-all shadow-lg shadow-zinc-200"
+            className="w-full py-4 bg-zinc-900 dark:bg-white dark:text-zinc-900 text-white rounded-2xl font-medium hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-all shadow-lg shadow-zinc-200 dark:shadow-zinc-900"
           >
             {authError ? "Try Again" : "Enter Room"}
           </button>
           <button
             onClick={handleLeave}
-            className="w-full py-4 bg-white text-zinc-500 rounded-2xl font-medium hover:bg-zinc-50 hover:text-zinc-900 transition-all border border-zinc-100"
+            className="w-full py-4 bg-white dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded-2xl font-medium hover:bg-zinc-50 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-white transition-all border border-zinc-100 dark:border-zinc-700"
           >
             Leave
           </button>
@@ -217,11 +217,11 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
       {/* Top Navigation / Status */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-zinc-900 rounded-2xl flex items-center justify-center shadow-xl shadow-zinc-200">
-            <div className="w-5 h-5 bg-white rounded-sm rotate-45" />
+          <div className="w-12 h-12 bg-zinc-900 dark:bg-white rounded-2xl flex items-center justify-center shadow-xl shadow-zinc-200 dark:shadow-zinc-800">
+            <div className="w-5 h-5 bg-white dark:bg-zinc-900 rounded-sm rotate-45" />
           </div>
           <div>
-            <h1 className="text-2xl font-display font-bold text-zinc-900 tracking-tight">DropSync</h1>
+            <h1 className="text-2xl font-display font-bold text-zinc-900 dark:text-white tracking-tight">DropSync</h1>
             <div className="flex items-center gap-2">
               <p className="text-zinc-400 text-xs font-medium uppercase tracking-widest">Secure Transfer</p>
               {effectivePassword && (
@@ -241,7 +241,7 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
                 <Activity className="w-3.5 h-3.5 text-zinc-400" />
                 <span>{latency}ms</span>
               </div>
-              <div className="w-px h-3 bg-zinc-200" />
+              <div className="w-px h-3 bg-zinc-200 dark:bg-zinc-600" />
               {latency < 50 ? (
                 <div className="flex items-center gap-1.5 text-emerald-600">
                   <SignalHigh className="w-3.5 h-3.5" />
@@ -267,7 +267,7 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
             </div>
           ) : (
             <div className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold uppercase tracking-widest ${
-              isConnected ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-zinc-100 text-zinc-500 border border-zinc-200"
+              isConnected ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700"
             }`}>
               <div className={`w-2 h-2 rounded-full shrink-0 ${isConnected ? "bg-emerald-500 animate-pulse" : "bg-zinc-300"}`} />
               {isConnected ? (
@@ -285,16 +285,16 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
               ) : "Waiting"}
             </div>
           )}
-          <button 
+          <button
             onClick={inspectConnection}
-            className="p-2 hover:bg-zinc-100 rounded-2xl text-zinc-400 hover:text-zinc-900 transition-all"
+            className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-2xl text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-all"
             title="Inspect Connection"
           >
             <Search className="w-5 h-5" />
           </button>
-          <button 
+          <button
             onClick={handleLeave}
-            className="p-2 hover:bg-zinc-100 rounded-2xl text-zinc-400 hover:text-red-500 transition-all"
+            className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-2xl text-zinc-400 hover:text-red-500 transition-all"
             title="Leave Room"
           >
             <X className="w-5 h-5" />
@@ -312,7 +312,7 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
             className={`relative group cursor-pointer border-2 border-dashed rounded-[3rem] p-12 lg:p-24 transition-all duration-700 flex flex-col items-center justify-center text-center space-y-8 overflow-hidden ${
               isDragging
                 ? "border-zinc-900 bg-zinc-900 text-white scale-[1.01] shadow-2xl shadow-zinc-300"
-                : "border-zinc-200 bg-white hover:border-zinc-400 hover:bg-zinc-50/50 shadow-xl shadow-zinc-100"
+                : "border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:border-zinc-400 dark:hover:border-zinc-500 hover:bg-zinc-50/50 shadow-xl shadow-zinc-100 dark:shadow-black/30"
             } ${!isConnected ? "opacity-50 cursor-not-allowed" : ""}`}
             onClick={() => isConnected && fileInputRef.current?.click()}
           >
@@ -341,7 +341,7 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
             <motion.div
               animate={isDragging ? { y: -15, scale: 1.1 } : { y: 0, scale: 1 }}
               className={`relative z-10 p-10 rounded-[2rem] transition-all duration-700 ${
-                isDragging ? "bg-white/10 text-white rotate-12" : "bg-zinc-50 text-zinc-400 group-hover:text-zinc-600 group-hover:bg-white group-hover:shadow-lg group-hover:shadow-zinc-100"
+                isDragging ? "bg-white/10 text-white rotate-12" : "bg-zinc-50 dark:bg-zinc-800 text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-200 group-hover:bg-white dark:group-hover:bg-zinc-700 group-hover:shadow-lg group-hover:shadow-zinc-100"
               }`}
             >
               <FileUp className="w-16 h-16" />
@@ -349,7 +349,7 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
 
             <div className="relative z-10 space-y-3">
               <p className={`text-3xl font-display font-bold tracking-tight transition-colors duration-700 ${
-                isDragging ? "text-white" : "text-zinc-900"
+                isDragging ? "text-white" : "text-zinc-900 dark:text-white"
               }`}>
                 {isDragging ? "Drop to send" : isConnected ? "Drop files here" : "Waiting for Peer"}
               </p>
@@ -534,26 +534,26 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
         <div className="lg:col-span-2 lg:order-1 space-y-6">
           <div className="glass p-8 rounded-[2.5rem] space-y-6">
             <div className="space-y-2">
-              <h3 className="text-sm font-bold text-zinc-900 uppercase tracking-widest">Room Access</h3>
-              <p className="text-xs text-zinc-500 leading-relaxed">Share this link with your peer to establish a direct connection.</p>
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-widest">Room Access</h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">Share this link with your peer to establish a direct connection.</p>
             </div>
 
             <div className="space-y-4">
-              <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 font-mono text-xs text-zinc-600 break-all">
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl border border-zinc-100 dark:border-zinc-700 font-mono text-xs text-zinc-600 dark:text-zinc-300 break-all">
                 {window.location.origin}/?room={roomId}
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <button 
+                <button
                   onClick={copyRoomLink}
-                  className="flex items-center justify-center gap-2 px-4 py-4 bg-zinc-900 text-white rounded-2xl text-sm font-bold hover:bg-zinc-800 transition-all active:scale-[0.98] shadow-lg shadow-zinc-200"
+                  className="flex items-center justify-center gap-2 px-4 py-4 bg-zinc-900 dark:bg-white dark:text-zinc-900 text-white rounded-2xl text-sm font-bold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-all active:scale-[0.98] shadow-lg shadow-zinc-200 dark:shadow-zinc-900"
                 >
                   <Copy className="w-4 h-4" />
                   Copy
                 </button>
-                <button 
+                <button
                   onClick={() => setShowQR(!showQR)}
                   className={`flex items-center justify-center gap-2 px-4 py-4 rounded-2xl text-sm font-bold transition-all active:scale-[0.98] border ${
-                    showQR ? "bg-zinc-100 text-zinc-900 border-zinc-200" : "bg-white text-zinc-900 border-zinc-200 hover:bg-zinc-50"
+                    showQR ? "bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-white border-zinc-200 dark:border-zinc-600" : "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700"
                   }`}
                 >
                   <QrCode className="w-4 h-4" />
@@ -570,7 +570,7 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
                   exit={{ opacity: 0, height: 0 }}
                   className="overflow-hidden"
                 >
-                  <div className="p-6 bg-zinc-50 rounded-3xl flex flex-col items-center gap-4 border border-zinc-100">
+                  <div className="p-6 bg-zinc-50 dark:bg-zinc-800 rounded-3xl flex flex-col items-center gap-4 border border-zinc-100 dark:border-zinc-700">
                     <div className="p-4 bg-white rounded-2xl shadow-sm border border-zinc-100">
                       <QRCodeSVG 
                         value={`${window.location.origin}/?room=${roomId}`}
@@ -587,22 +587,22 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
               )}
             </AnimatePresence>
 
-            <div className="pt-6 border-t border-zinc-100 grid grid-cols-2 gap-x-4 gap-y-4">
+            <div className="pt-6 border-t border-zinc-100 dark:border-zinc-700 grid grid-cols-2 gap-x-4 gap-y-4">
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Protocol</p>
-                <p className="text-xs font-medium text-zinc-900">WebRTC P2P</p>
+                <p className="text-xs font-medium text-zinc-900 dark:text-white">WebRTC P2P</p>
               </div>
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Encryption</p>
-                <p className="text-xs font-medium text-zinc-900">{effectivePassword ? "AES-GCM 256" : "None"}</p>
+                <p className="text-xs font-medium text-zinc-900 dark:text-white">{effectivePassword ? "AES-GCM 256" : "None"}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Sent</p>
-                <p className="text-xs font-medium text-zinc-900">{stats.sent} file{stats.sent !== 1 ? "s" : ""}</p>
+                <p className="text-xs font-medium text-zinc-900 dark:text-white">{stats.sent} file{stats.sent !== 1 ? "s" : ""}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Received</p>
-                <p className="text-xs font-medium text-zinc-900">{stats.received} file{stats.received !== 1 ? "s" : ""}</p>
+                <p className="text-xs font-medium text-zinc-900 dark:text-white">{stats.received} file{stats.received !== 1 ? "s" : ""}</p>
               </div>
             </div>
           </div>
@@ -612,9 +612,9 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <History className="w-4 h-4 text-zinc-400" />
-                <h3 className="text-sm font-bold text-zinc-900 uppercase tracking-widest">Recent Activity</h3>
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-widest">Recent Activity</h3>
               </div>
-              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest bg-zinc-50 px-2 py-1 rounded-md">Last 10</span>
+              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest bg-zinc-50 dark:bg-zinc-800 px-2 py-1 rounded-md">Last 10</span>
             </div>
 
             <div className="space-y-3">
@@ -629,7 +629,7 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
                     key={idx}
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="flex items-center justify-between p-3 bg-zinc-50/50 rounded-xl border border-zinc-100/50 gap-2"
+                    className="flex items-center justify-between p-3 bg-zinc-50/50 dark:bg-zinc-800/50 rounded-xl border border-zinc-100/50 dark:border-zinc-700/50 gap-2"
                   >
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className={`shrink-0 p-1.5 rounded-lg ${
@@ -638,7 +638,7 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
                         {item.direction === "send" ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownLeft className="w-3 h-3" />}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-xs font-bold text-zinc-900 truncate">{item.name}</p>
+                        <p className="text-xs font-bold text-zinc-900 dark:text-white truncate">{item.name}</p>
                         <p className="text-[9px] font-medium text-zinc-400 uppercase tracking-wider">
                           {(item.size / (1024 * 1024)).toFixed(2)} MB
                         </p>
@@ -648,7 +648,7 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
                       {item.direction === "send" && item.file && isConnected && (
                         <button
                           onClick={() => sendFiles([item.file])}
-                          className="p-1.5 hover:bg-zinc-100 rounded-lg text-zinc-400 hover:text-zinc-700 transition-colors"
+                          className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition-colors"
                           title="Resend"
                         >
                           <RotateCcw className="w-3 h-3" />
@@ -672,7 +672,7 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
           <div className="glass p-8 rounded-[2.5rem] space-y-4">
             <div className="flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-zinc-400" />
-              <h3 className="text-sm font-bold text-zinc-900 uppercase tracking-widest">Chat</h3>
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-widest">Chat</h3>
             </div>
 
             <div className="h-56 overflow-y-auto space-y-2 pr-1">
@@ -689,8 +689,8 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
                   >
                     <div className={`max-w-[80%] px-3.5 py-2 rounded-2xl text-sm leading-snug break-words ${
                       msg.from === "me"
-                        ? "bg-zinc-900 text-white rounded-br-sm"
-                        : "bg-zinc-100 text-zinc-900 rounded-bl-sm"
+                        ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-br-sm"
+                        : "bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-white rounded-bl-sm"
                     }`}>
                       {msg.text}
                       <span className={`block text-[9px] mt-0.5 ${msg.from === "me" ? "text-zinc-400" : "text-zinc-400"}`}>
@@ -711,7 +711,7 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
                 onChange={(e) => setChatInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSendChat()}
                 disabled={!isConnected}
-                className="flex-1 px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                className="flex-1 px-4 py-3 bg-zinc-50 dark:bg-zinc-800 dark:text-white dark:placeholder-zinc-500 border border-zinc-100 dark:border-zinc-700 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 dark:focus:ring-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
               />
               <button
                 onClick={handleSendChat}
@@ -736,7 +736,7 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
             className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 glass px-6 py-3 rounded-2xl flex items-center gap-3 shadow-2xl"
           >
             <div className={`w-2 h-2 rounded-full ${notification.type === "success" ? "bg-emerald-500" : "bg-zinc-900"}`} />
-            <p className="text-sm font-bold text-zinc-900">{notification.message}</p>
+            <p className="text-sm font-bold text-zinc-900 dark:text-white">{notification.message}</p>
           </motion.div>
         )}
       </AnimatePresence>
