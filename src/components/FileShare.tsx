@@ -303,8 +303,235 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
       </div>
 
       <div className="grid lg:grid-cols-5 gap-8">
-        {/* Right Column: Transfer Area — rendered first in DOM so it appears at top on mobile */}
+        {/* Transfer Area — first in DOM = top on mobile; lg:order-2 = right on desktop */}
         <div className="lg:col-span-3 lg:order-2 space-y-6">
+          <div
+            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+            className={`relative group cursor-pointer border-2 border-dashed rounded-[3rem] p-12 lg:p-24 transition-all duration-700 flex flex-col items-center justify-center text-center space-y-8 overflow-hidden ${
+              isDragging
+                ? "border-zinc-900 bg-zinc-900 text-white scale-[1.01] shadow-2xl shadow-zinc-300"
+                : "border-zinc-200 bg-white hover:border-zinc-400 hover:bg-zinc-50/50 shadow-xl shadow-zinc-100"
+            } ${!isConnected ? "opacity-50 cursor-not-allowed" : ""}`}
+            onClick={() => isConnected && fileInputRef.current?.click()}
+          >
+            <AnimatePresence>
+              {isDragging && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 z-0 pointer-events-none"
+                >
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent)] animate-pulse" />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              className="hidden"
+              multiple
+              disabled={!isConnected}
+            />
+
+            <motion.div
+              animate={isDragging ? { y: -15, scale: 1.1 } : { y: 0, scale: 1 }}
+              className={`relative z-10 p-10 rounded-[2rem] transition-all duration-700 ${
+                isDragging ? "bg-white/10 text-white rotate-12" : "bg-zinc-50 text-zinc-400 group-hover:text-zinc-600 group-hover:bg-white group-hover:shadow-lg group-hover:shadow-zinc-100"
+              }`}
+            >
+              <FileUp className="w-16 h-16" />
+            </motion.div>
+
+            <div className="relative z-10 space-y-3">
+              <p className={`text-3xl font-display font-bold tracking-tight transition-colors duration-700 ${
+                isDragging ? "text-white" : "text-zinc-900"
+              }`}>
+                {isDragging ? "Drop to send" : isConnected ? "Drop files here" : "Waiting for Peer"}
+              </p>
+              <p className={`text-sm font-light transition-colors duration-700 ${
+                isDragging ? "text-white/60" : "text-zinc-500"
+              }`}>
+                {isConnected ? "or click to select multiple files" : "Establishing secure P2P tunnel..."}
+              </p>
+            </div>
+          </div>
+
+          {/* Incoming File Requests */}
+          <AnimatePresence>
+            {Object.values(pendingFiles).length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 16 }}
+                className="space-y-3"
+              >
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-1">
+                  Incoming Files
+                </p>
+                {Object.values(pendingFiles).map((pf) => (
+                  <motion.div
+                    key={pf.id}
+                    initial={{ opacity: 0, scale: 0.97 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.97 }}
+                    className="glass p-5 rounded-[2rem] border-2 border-zinc-900/10 bg-zinc-50/60"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="p-2.5 rounded-xl bg-purple-50 text-purple-500 shrink-0">
+                        {React.cloneElement(getFileIcon(pf.name) as React.ReactElement, { className: "w-5 h-5" })}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-zinc-900 truncate">{pf.name}</p>
+                        <p className="text-[10px] font-medium text-zinc-400 uppercase tracking-widest">
+                          {(pf.size / (1024 * 1024)).toFixed(2)} MB · Peer wants to send this file
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => declineFile(pf.id)}
+                          className="p-2 hover:bg-red-50 rounded-xl text-zinc-400 hover:text-red-500 transition-colors"
+                          title="Decline"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => acceptFile(pf.id)}
+                          className="flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white rounded-xl text-xs font-bold hover:bg-zinc-700 transition-colors"
+                          title="Accept & Download"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          Accept
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Progress Section */}
+          <div className="space-y-4">
+            <AnimatePresence>
+              {(Object.values(transfers) as FileTransferProgress[])
+                .filter(t => ["sending", "receiving", "error", "cancelled"].includes(t.status))
+                .map((t) => (
+                  <motion.div
+                    key={t.id}
+                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className={`glass p-6 rounded-[2rem] ${
+                      t.status === "error" ? "border-red-100 bg-red-50/30" : ""
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-4">
+                        <div className={`p-2.5 rounded-xl relative ${
+                          t.status === "error" ? "bg-red-50" :
+                          t.status === "cancelled" ? "bg-amber-50" :
+                          "bg-zinc-900 shadow-md shadow-zinc-200"
+                        }`}>
+                          <div className={
+                            t.status === "error" ? "text-red-600" :
+                            t.status === "cancelled" ? "text-amber-600" :
+                            "text-white"
+                          }>
+                            {React.cloneElement(getFileIcon(t.name) as React.ReactElement, { className: "w-5 h-5" })}
+                          </div>
+                          <div className={`absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center ${
+                            t.direction === "send" ? "bg-blue-500" : "bg-purple-500"
+                          }`}>
+                            {t.direction === "send" ? <ArrowUpRight className="w-2 h-2 text-white" /> : <ArrowDownLeft className="w-2 h-2 text-white" />}
+                          </div>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-zinc-900 truncate max-w-[180px]">
+                            {t.name}
+                          </p>
+                          <p className={`text-[10px] font-medium uppercase tracking-widest ${
+                            t.status === "error" ? "text-red-500" :
+                            t.status === "cancelled" ? "text-amber-500" :
+                            "text-zinc-400"
+                          }`}>
+                            {(t.size / (1024 * 1024)).toFixed(2)} MB • {t.status}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {t.status === "error" && (
+                          <button
+                            onClick={() => retryTransfer(t.id)}
+                            className="p-2 hover:bg-red-100 rounded-full text-red-500 transition-colors"
+                            title="Retry Transfer"
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                          </button>
+                        )}
+                        {(t.status === "sending" || t.status === "receiving") && (
+                          <button
+                            onClick={() => cancelTransfer(t.id)}
+                            className="p-2 hover:bg-zinc-100 rounded-full text-zinc-400 hover:text-red-500 transition-colors"
+                            title="Cancel Transfer"
+                          >
+                            <Ban className="w-4 h-4" />
+                          </button>
+                        )}
+                        {t.status === "error" ? (
+                          <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
+                            <AlertCircle className="w-5 h-5 text-white" />
+                          </div>
+                        ) : t.status === "cancelled" ? (
+                          <div className="w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center">
+                            <Ban className="w-5 h-5 text-white" />
+                          </div>
+                        ) : (
+                          <div className="w-8 h-8 bg-zinc-100 rounded-full flex items-center justify-center">
+                            <Loader2 className="w-5 h-5 text-zinc-400 animate-spin" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {t.status === "error" || t.status === "cancelled" ? (
+                      <div className={`rounded-xl p-3 flex items-start gap-3 border ${
+                        t.status === "error" ? "bg-red-50/50 border-red-100" : "bg-amber-50/50 border-amber-100"
+                      }`}>
+                        <p className={`text-[11px] leading-relaxed font-medium ${
+                          t.status === "error" ? "text-red-700" : "text-amber-700"
+                        }`}>
+                          {t.error || (t.status === "cancelled" ? "Transfer cancelled." : "Error occurred.")}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="h-2 w-full bg-zinc-100 rounded-full overflow-hidden">
+                          <motion.div
+                            className="h-full bg-zinc-900 rounded-full"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${t.progress}%` }}
+                            transition={{ duration: 0.3 }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-[9px] font-bold text-zinc-400 uppercase tracking-widest">
+                          <span>{t.progress}%</span>
+                          <span>{t.direction === "send" ? "Uploading" : "Downloading"}</span>
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                ))}
+            </AnimatePresence>
+          </div>
+        </div>
+
+        {/* Room Controls — lg:order-1 = left on desktop, below transfer area on mobile */}
+        <div className="lg:col-span-2 lg:order-1 space-y-6">
           <div className="glass p-8 rounded-[2.5rem] space-y-6">
             <div className="space-y-2">
               <h3 className="text-sm font-bold text-zinc-900 uppercase tracking-widest">Room Access</h3>
@@ -497,233 +724,6 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
           </div>
         </div>
 
-        {/* Left Column: Room Controls */}
-        <div className="lg:col-span-2 lg:order-1 space-y-6">
-          <div
-            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={handleDrop}
-            className={`relative group cursor-pointer border-2 border-dashed rounded-[3rem] p-12 lg:p-24 transition-all duration-700 flex flex-col items-center justify-center text-center space-y-8 overflow-hidden ${
-              isDragging 
-                ? "border-zinc-900 bg-zinc-900 text-white scale-[1.01] shadow-2xl shadow-zinc-300" 
-                : "border-zinc-200 bg-white hover:border-zinc-400 hover:bg-zinc-50/50 shadow-xl shadow-zinc-100"
-            } ${!isConnected ? "opacity-50 cursor-not-allowed" : ""}`}
-            onClick={() => isConnected && fileInputRef.current?.click()}
-          >
-            {/* Animated Background when dragging */}
-            <AnimatePresence>
-              {isDragging && (
-                <motion.div 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute inset-0 z-0 pointer-events-none"
-                >
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent)] animate-pulse" />
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              onChange={handleFileChange} 
-              className="hidden" 
-              multiple
-              disabled={!isConnected}
-            />
-            
-            <motion.div 
-              animate={isDragging ? { y: -15, scale: 1.1 } : { y: 0, scale: 1 }}
-              className={`relative z-10 p-10 rounded-[2rem] transition-all duration-700 ${
-                isDragging ? "bg-white/10 text-white rotate-12" : "bg-zinc-50 text-zinc-400 group-hover:text-zinc-600 group-hover:bg-white group-hover:shadow-lg group-hover:shadow-zinc-100"
-              }`}
-            >
-              <FileUp className="w-16 h-16" />
-            </motion.div>
-            
-            <div className="relative z-10 space-y-3">
-              <p className={`text-3xl font-display font-bold tracking-tight transition-colors duration-700 ${
-                isDragging ? "text-white" : "text-zinc-900"
-              }`}>
-                {isDragging ? "Drop to send" : isConnected ? "Drop files here" : "Waiting for Peer"}
-              </p>
-              <p className={`text-sm font-light transition-colors duration-700 ${
-                isDragging ? "text-white/60" : "text-zinc-500"
-              }`}>
-                {isConnected ? "or click to select multiple files" : "Establishing secure P2P tunnel..."}
-              </p>
-            </div>
-          </div>
-
-          {/* Incoming File Requests */}
-          <AnimatePresence>
-            {Object.values(pendingFiles).length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 16 }}
-                className="space-y-3"
-              >
-                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-1">
-                  Incoming Files
-                </p>
-                {Object.values(pendingFiles).map((pf) => (
-                  <motion.div
-                    key={pf.id}
-                    initial={{ opacity: 0, scale: 0.97 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.97 }}
-                    className="glass p-5 rounded-[2rem] border-2 border-zinc-900/10 bg-zinc-50/60"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="p-2.5 rounded-xl bg-purple-50 text-purple-500 shrink-0">
-                        {React.cloneElement(getFileIcon(pf.name) as React.ReactElement, { className: "w-5 h-5" })}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-zinc-900 truncate">{pf.name}</p>
-                        <p className="text-[10px] font-medium text-zinc-400 uppercase tracking-widest">
-                          {(pf.size / (1024 * 1024)).toFixed(2)} MB · Peer wants to send this file
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          onClick={() => declineFile(pf.id)}
-                          className="p-2 hover:bg-red-50 rounded-xl text-zinc-400 hover:text-red-500 transition-colors"
-                          title="Decline"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => acceptFile(pf.id)}
-                          className="flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white rounded-xl text-xs font-bold hover:bg-zinc-700 transition-colors"
-                          title="Accept & Download"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          Accept
-                        </button>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Progress Section */}
-          <div className="space-y-4">
-            <AnimatePresence>
-              {(Object.values(transfers) as FileTransferProgress[])
-                .filter(t => ["sending", "receiving", "error", "cancelled"].includes(t.status))
-                .map((t) => (
-                  <motion.div
-                    key={t.id}
-                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    className={`glass p-6 rounded-[2rem] ${
-                      t.status === "error" ? "border-red-100 bg-red-50/30" : ""
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-4">
-                        <div className={`p-2.5 rounded-xl relative ${
-                          t.status === "error" ? "bg-red-50" : 
-                          t.status === "cancelled" ? "bg-amber-50" :
-                          "bg-zinc-900 shadow-md shadow-zinc-200"
-                        }`}>
-                          <div className={
-                            t.status === "error" ? "text-red-600" : 
-                            t.status === "cancelled" ? "text-amber-600" :
-                            "text-white"
-                          }>
-                            {React.cloneElement(getFileIcon(t.name) as React.ReactElement, { className: "w-5 h-5" })}
-                          </div>
-                          <div className={`absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center ${
-                            t.direction === "send" ? "bg-blue-500" : "bg-purple-500"
-                          }`}>
-                            {t.direction === "send" ? <ArrowUpRight className="w-2 h-2 text-white" /> : <ArrowDownLeft className="w-2 h-2 text-white" />}
-                          </div>
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold text-zinc-900 truncate max-w-[180px]">
-                            {t.name}
-                          </p>
-                          <p className={`text-[10px] font-medium uppercase tracking-widest ${
-                            t.status === "error" ? "text-red-500" : 
-                            t.status === "cancelled" ? "text-amber-500" :
-                            "text-zinc-400"
-                          }`}>
-                            {(t.size / (1024 * 1024)).toFixed(2)} MB • {t.status}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {t.status === "error" && (
-                          <button 
-                            onClick={() => retryTransfer(t.id)}
-                            className="p-2 hover:bg-red-100 rounded-full text-red-500 transition-colors"
-                            title="Retry Transfer"
-                          >
-                            <RotateCcw className="w-4 h-4" />
-                          </button>
-                        )}
-                        {(t.status === "sending" || t.status === "receiving") && (
-                          <button 
-                            onClick={() => cancelTransfer(t.id)}
-                            className="p-2 hover:bg-zinc-100 rounded-full text-zinc-400 hover:text-red-500 transition-colors"
-                            title="Cancel Transfer"
-                          >
-                            <Ban className="w-4 h-4" />
-                          </button>
-                        )}
-                        {t.status === "error" ? (
-                          <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
-                            <AlertCircle className="w-5 h-5 text-white" />
-                          </div>
-                        ) : t.status === "cancelled" ? (
-                          <div className="w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center">
-                            <Ban className="w-5 h-5 text-white" />
-                          </div>
-                        ) : (
-                          <div className="w-8 h-8 bg-zinc-100 rounded-full flex items-center justify-center">
-                            <Loader2 className="w-5 h-5 text-zinc-400 animate-spin" />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {t.status === "error" || t.status === "cancelled" ? (
-                      <div className={`rounded-xl p-3 flex items-start gap-3 border ${
-                        t.status === "error" ? "bg-red-50/50 border-red-100" : "bg-amber-50/50 border-amber-100"
-                      }`}>
-                        <p className={`text-[11px] leading-relaxed font-medium ${
-                          t.status === "error" ? "text-red-700" : "text-amber-700"
-                        }`}>
-                          {t.error || (t.status === "cancelled" ? "Transfer cancelled." : "Error occurred.")}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <div className="h-2 w-full bg-zinc-100 rounded-full overflow-hidden">
-                          <motion.div 
-                            className="h-full bg-zinc-900 rounded-full"
-                            initial={{ width: 0 }}
-                            animate={{ width: `${t.progress}%` }}
-                            transition={{ duration: 0.3 }}
-                          />
-                        </div>
-                        <div className="flex justify-between text-[9px] font-bold text-zinc-400 uppercase tracking-widest">
-                          <span>{t.progress}%</span>
-                          <span>{t.direction === "send" ? "Uploading" : "Downloading"}</span>
-                        </div>
-                      </div>
-                    )}
-                  </motion.div>
-                ))}
-            </AnimatePresence>
-          </div>
-        </div>
       </div>
 
       {/* Notification Toast */}
