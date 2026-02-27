@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { FileShare } from "./components/FileShare";
-import { Shield, Globe, ArrowRightLeft, Sun, Moon, Lock, Link, Download } from "lucide-react";
+import { Shield, Globe, ArrowRightLeft, Sun, Moon, Lock, Link, Download, Zap, EyeOff, Infinity } from "lucide-react";
 import { motion } from "motion/react";
 
 function useDarkMode(): [boolean, () => void] {
@@ -167,15 +167,11 @@ export default function App() {
             />
           </div>
 
-          <div className="pt-2 flex items-center gap-6 text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
-            <div className="flex items-center gap-2">
-              <Globe className="w-3.5 h-3.5" />
-              Browser-to-Browser
-            </div>
-            <div className="flex items-center gap-2">
-              <Shield className="w-3.5 h-3.5" />
-              E2E Encrypted
-            </div>
+          <div className="grid grid-cols-2 gap-3">
+            <FeaturePill icon={<Shield className="w-4 h-4" />} label="E2E Encrypted" desc="AES-GCM 256 with PBKDF2 key derivation" />
+            <FeaturePill icon={<EyeOff className="w-4 h-4" />} label="Zero Cloud" desc="Files never touch a server" />
+            <FeaturePill icon={<Infinity className="w-4 h-4" />} label="No Size Limits" desc="Stream gigabytes peer-to-peer" />
+            <FeaturePill icon={<Zap className="w-4 h-4" />} label="Instant" desc="Direct WebRTC data channel" />
           </div>
         </div>
       </div>
@@ -203,6 +199,20 @@ function Step({ num, icon, title, desc, delay }: { num: string; icon: React.Reac
         <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed font-light">{desc}</p>
       </div>
     </motion.div>
+  );
+}
+
+function FeaturePill({ icon, label, desc }: { icon: React.ReactNode; label: string; desc: string }) {
+  return (
+    <div className="flex items-start gap-3 p-3 bg-white dark:bg-zinc-800/60 rounded-2xl border border-zinc-100 dark:border-zinc-700/50">
+      <div className="shrink-0 w-8 h-8 bg-zinc-100 dark:bg-zinc-700 rounded-xl flex items-center justify-center text-zinc-600 dark:text-zinc-300">
+        {icon}
+      </div>
+      <div>
+        <p className="text-xs font-semibold text-zinc-900 dark:text-white leading-tight">{label}</p>
+        <p className="text-[11px] text-zinc-400 dark:text-zinc-500 leading-tight mt-0.5">{desc}</p>
+      </div>
+    </div>
   );
 }
 
