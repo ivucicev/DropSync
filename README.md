@@ -2,7 +2,7 @@
 
 **Send files directly to anyone. No accounts, no cloud, no limits.**
 
-DropSync creates an encrypted tunnel straight between two browsers — your files go from your machine to theirs and nowhere else. Share the link, connect, and drop.
+DropSync creates an encrypted tunnel straight between two browsers - your files go from your machine to theirs and nowhere else. Share the link, connect, and drop.
 
 ![DropSync](public/screenshot.png)
 
@@ -12,7 +12,7 @@ DropSync creates an encrypted tunnel straight between two browsers — your file
 
 Most file sharing tools upload your data to a server, charge you for storage, enforce file size limits, and keep logs. DropSync does none of that.
 
-The moment both browsers are connected, the server steps out of the way. Everything — files, messages, keys — flows peer-to-peer, encrypted in your browser before it leaves.
+The moment both browsers are connected, the server steps out of the way. Everything - files, messages, keys - flows peer-to-peer, encrypted in your browser before it leaves.
 
 ---
 
@@ -22,7 +22,7 @@ The moment both browsers are connected, the server steps out of the way. Everyth
 Files go directly between devices using WebRTC. The server only brokers the initial handshake, never sees your data.
 
 **End-to-end encryption**
-Set a room password and all transfers are encrypted with AES-GCM 256. Keys are derived locally with PBKDF2 — your password never leaves your device.
+Set a room password and all transfers are encrypted with AES-GCM 256. Keys are derived locally with PBKDF2 - your password never leaves your device.
 
 **Password-protected rooms**
 Rooms can require a password before anyone connects. Authentication uses an HMAC-SHA256 challenge-response so the password itself is never transmitted.
@@ -60,17 +60,17 @@ docker compose up
 
 ## How it works
 
-### Step 1 — Create a room
+### Step 1 - Create a room
 
-Click **Create Secure Room** on the landing page. A unique room ID is generated and added to the URL. Optionally type a password first — this enables AES-GCM 256 end-to-end encryption for all files and chat in that room. Without a password, transfers still go directly peer-to-peer, just unencrypted.
+Click **Create Secure Room** on the landing page. A unique room ID is generated and added to the URL. Optionally type a password first - this enables AES-GCM 256 end-to-end encryption for all files and chat in that room. Without a password, transfers still go directly peer-to-peer, just unencrypted.
 
-### Step 2 — Share the link
+### Step 2 - Share the link
 
-Copy the room URL or scan the QR code shown on the room page. Send it however you like — message, email, show it on screen. Your peer opens it in any modern browser. If you set a password, they'll be prompted for it before connecting.
+Copy the room URL or scan the QR code shown on the room page. Send it however you like - message, email, show it on screen. Your peer opens it in any modern browser. If you set a password, they'll be prompted for it before connecting.
 
-### Step 3 — Drop files and receive
+### Step 3 - Drop files and receive
 
-Once your peer joins, the connection status turns green. Drag files onto the drop zone or tap to select them. Your peer gets an incoming file request and clicks Accept to download. Files go directly from your browser to theirs — no upload, no server, no cloud storage.
+Once your peer joins, the connection status turns green. Drag files onto the drop zone or tap to select them. Your peer gets an incoming file request and clicks Accept to download. Files go directly from your browser to theirs - no upload, no server, no cloud storage.
 
 ---
 
@@ -92,14 +92,14 @@ Once your peer joins, the connection status turns green. Drag files onto the dro
 | Frontend | React 19, TypeScript, Tailwind CSS v4, Framer Motion |
 | P2P transport | WebRTC RTCDataChannel |
 | Signaling | Socket.IO + Express |
-| Cryptography | Web Crypto API — AES-GCM, PBKDF2, HMAC-SHA256 |
+| Cryptography | Web Crypto API - AES-GCM, PBKDF2, HMAC-SHA256 |
 | Bundler | Vite 6 |
 
 ---
 
 ## Self-hosting
 
-The signaling server is a tiny Node.js process — it only relays the WebRTC handshake and never touches your files. Once peers connect, the server is completely out of the loop.
+The signaling server is a tiny Node.js process - it only relays the WebRTC handshake and never touches your files. Once peers connect, the server is completely out of the loop.
 
 ---
 
@@ -115,15 +115,15 @@ Not all networks can establish direct P2P connections. Understanding this is imp
 | Both peers on 5G / mobile data | ❌ Often fails | CGNAT blocks direct connections |
 | Corporate / university network | ❌ Often fails | Strict firewalls block UDP |
 
-**The default build uses [Open Relay](https://www.metered.ca/tools/openrelay/)** — a free community TURN server — as a fallback for when direct connections fail. This helps with many mobile scenarios but Open Relay is rate-limited, not guaranteed, and not suitable for production. For reliable 5G and mobile support you need your own TURN server (see below).
+**The default build uses [Open Relay](https://www.metered.ca/tools/openrelay/)** - a free community TURN server - as a fallback for when direct connections fail. This helps with many mobile scenarios but Open Relay is rate-limited, not guaranteed, and not suitable for production. For reliable 5G and mobile support you need your own TURN server (see below).
 
 ---
 
 ### Why 5G and mobile networks fail without TURN
 
-Mobile carriers use **Carrier-Grade NAT (CGNAT)** — thousands of subscribers share a single public IP address. STUN can discover your external address but the carrier's NAT blocks incoming connection attempts, so both peers wait forever for a packet that never arrives.
+Mobile carriers use **Carrier-Grade NAT (CGNAT)** - thousands of subscribers share a single public IP address. STUN can discover your external address but the carrier's NAT blocks incoming connection attempts, so both peers wait forever for a packet that never arrives.
 
-A **TURN server** solves this by acting as a relay. When no direct path exists, both peers connect to the TURN server and it forwards packets between them. The connection is still encrypted end-to-end — TURN only sees ciphertext.
+A **TURN server** solves this by acting as a relay. When no direct path exists, both peers connect to the TURN server and it forwards packets between them. The connection is still encrypted end-to-end - TURN only sees ciphertext.
 
 Without a working TURN server:
 - WiFi-to-WiFi: works fine
@@ -134,7 +134,7 @@ Without a working TURN server:
 
 ### Setting up your own TURN server (recommended for production)
 
-You need a VPS with a public static IP (Azure, DigitalOcean, Hetzner, etc.). The TURN server must be reachable from the open internet — it cannot sit behind a Cloudflare proxy or another NAT.
+You need a VPS with a public static IP (Azure, DigitalOcean, Hetzner, etc.). The TURN server must be reachable from the open internet - it cannot sit behind a Cloudflare proxy or another NAT.
 
 #### 1. Install Coturn
 
@@ -145,7 +145,7 @@ sudo apt update && sudo apt install -y coturn
 #### 2. Get a TLS certificate
 
 ```bash
-# Using Cloudflare DNS challenge (recommended — no need to open port 80)
+# Using Cloudflare DNS challenge (recommended - no need to open port 80)
 sudo apt install -y python3-certbot-dns-cloudflare
 
 # Create Cloudflare API credentials
