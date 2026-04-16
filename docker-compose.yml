@@ -5,4 +5,12 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
+      # Optional: see docker-compose.prod.yml for full HTTPS / TLS options
+      # (bring-your-own cert, self-signed, or Let's Encrypt via certbot).
+      # - PORT=3000
+      # - TLS_CERT=/certs/fullchain.pem
+      # - TLS_KEY=/certs/privkey.pem
+      # - GENERATE_SELF_SIGNED_CERT=true
+      # - USE_LETSENCRYPT=true
+      # - CERT_DOMAIN=localhost
     restart: always
