@@ -1,0 +1,20 @@
+services:
+  dropsync:
+    image: ghcr.io/ivucicev/dropsync:latest
+    restart: unless-stopped
+    container_name: dropsync
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
