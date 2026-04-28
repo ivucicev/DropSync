@@ -4,6 +4,7 @@ import {
   FileUp,
   Loader2,
   Copy,
+  Share2,
   FileIcon,
   AlertCircle,
   Shield,
@@ -150,6 +151,11 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
   const copyRoomLink = () => {
     const url = `${window.location.origin}/?room=${roomId}`;
     navigator.clipboard.writeText(url);
+  };
+
+  const shareRoomLink = () => {
+    const url = `${window.location.origin}/?room=${roomId}`;
+    navigator.share({ title: "DropSync Room", url });
   };
 
   const handleLeave = () => {
@@ -542,23 +548,36 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
               <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl border border-zinc-100 dark:border-zinc-700 font-mono text-xs text-zinc-600 dark:text-zinc-300 break-all">
                 {window.location.origin}/?room={roomId}
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-3">
                 <button
                   onClick={copyRoomLink}
                   className="flex items-center justify-center gap-2 px-4 py-4 bg-zinc-900 dark:bg-white dark:text-zinc-900 text-white rounded-2xl text-sm font-bold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-all active:scale-[0.98] shadow-lg shadow-zinc-200 dark:shadow-zinc-900"
                 >
                   <Copy className="w-4 h-4" />
-                  Copy
+                  Copy Link
                 </button>
-                <button
-                  onClick={() => setShowQR(!showQR)}
-                  className={`flex items-center justify-center gap-2 px-4 py-4 rounded-2xl text-sm font-bold transition-all active:scale-[0.98] border ${
-                    showQR ? "bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-white border-zinc-200 dark:border-zinc-600" : "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700"
-                  }`}
-                >
-                  <QrCode className="w-4 h-4" />
-                  QR Code
-                </button>
+                <div className="grid grid-cols-2 gap-3">
+                  {typeof navigator !== "undefined" && "share" in navigator && (
+                    <button
+                      onClick={shareRoomLink}
+                      className="flex items-center justify-center gap-2 px-4 py-3 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white rounded-2xl text-sm font-bold border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all active:scale-[0.98]"
+                    >
+                      <Share2 className="w-4 h-4" />
+                      Share
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowQR(!showQR)}
+                    className={`flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-sm font-bold transition-all active:scale-[0.98] border ${
+                      typeof navigator !== "undefined" && "share" in navigator ? "" : "col-span-2"
+                    } ${
+                      showQR ? "bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-white border-zinc-200 dark:border-zinc-600" : "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+                    }`}
+                  >
+                    <QrCode className="w-4 h-4" />
+                    QR Code
+                  </button>
+                </div>
               </div>
             </div>
 
