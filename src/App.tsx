@@ -75,6 +75,7 @@ export default function App() {
                 <div className="w-4 h-4 bg-white dark:bg-zinc-900 rounded-sm rotate-45" />
               </div>
               <span className="font-display font-bold text-xl tracking-tight dark:text-white">DropSync</span>
+              <span className="text-[10px] font-mono font-medium text-zinc-400 dark:text-zinc-500 leading-none">v{__APP_VERSION__}</span>
             </div>
             <DarkToggle dark={dark} onToggle={toggleDark} />
           </div>

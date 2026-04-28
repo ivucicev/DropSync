@@ -227,7 +227,10 @@ export const FileShare: React.FC<FileShareProps> = ({ roomId, initialPassword, o
             <div className="w-5 h-5 bg-white dark:bg-zinc-900 rounded-sm rotate-45" />
           </div>
           <div>
-            <h1 className="text-2xl font-display font-bold text-zinc-900 dark:text-white tracking-tight">DropSync</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-display font-bold text-zinc-900 dark:text-white tracking-tight">DropSync</h1>
+              <span className="text-[10px] font-mono font-medium text-zinc-400 dark:text-zinc-500 leading-none">v{__APP_VERSION__}</span>
+            </div>
             <div className="flex items-center gap-2">
               <p className="text-zinc-400 text-xs font-medium uppercase tracking-widest">Secure Transfer</p>
               {effectivePassword && (
