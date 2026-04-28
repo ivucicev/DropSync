@@ -1,0 +1,96 @@
+services:
+  dropsync:
+    build: .
+    #image: ghcr.io/ivucicev/dropsync:latest
+    restart: unless-stopped
+    container_name: dropsync
+    ports:
+      # Default: plain HTTP. Change left side to use a different host port.
+      - "3000:3000"
+      # Required for Let's Encrypt (Option 3): port 80 serves ACME challenges and
+      # redirects HTTP → HTTPS. Must also change the main port to 443:443 below.
+      # - "80:80"
+      # - "443:443"
+    environment:
+      - NODE_ENV=production
+      # Optional: port the server listens on inside the container.
+      # When using HTTPS with a real domain, set this to 443.
+      # - PORT=3000
+
+      # ── Option 1: Bring your own certificate ─────────────────────────────────
+      # Paths to pre-existing cert/key files, mounted read-only via 'volumes' below.
+      # - TLS_CERT=/certs/fullchain.pem
+      # - TLS_KEY=/certs/privkey.pem
+
+      # ── Option 2: Self-signed certificate (LAN / local testing only) ─────────
+      # Auto-generates a cert on first start. Browsers will show a security warning.
+      # Not suitable for public-facing deployments.
+      # - GENERATE_SELF_SIGNED_CERT=true
+      # - CERT_DOMAIN=localhost
+
+      # ── Option 3: Let's Encrypt via certbot (recommended for production) ──────
+      # Requires the 'certbot' service — start with: --profile letsencrypt
+      # Also uncomment ports 80:80 and 443:443 above, and set PORT=443.
+      # CERT_DOMAIN must be a publicly reachable domain pointing to this server.
+      # - USE_LETSENCRYPT=true
+      # - CERT_DOMAIN=yourdomain.com
+      # - ACME_WEBROOT=/webroot    # path certbot writes challenge files to (shared volume)
+
+    # volumes:
+      # Option 1: bring your own cert (mount files read-only).
+      # - /etc/letsencrypt/live/yourdomain.com/fullchain.pem:/certs/fullchain.pem:ro
+      # - /etc/letsencrypt/live/yourdomain.com/privkey.pem:/certs/privkey.pem:ro
+
+      # Option 3: shared volumes with the certbot service (uncomment both).
+      # - letsencrypt:/etc/letsencrypt
+      # - acme-webroot:/webroot
+
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    healthcheck:
+      # Change 'http' → 'https' and port 3000 → 443 when HTTPS is enabled.
+      # For self-signed certs (Option 2) add '--no-check-certificate' before the URL.
+      # When using Let's Encrypt (Option 3) the container may take up to 2 min to start
+      # while waiting for the certbot service — increase start_period accordingly.
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ── Certbot / Let's Encrypt (Option 3) ────────────────────────────────────────
+  # Only starts when you pass '--profile letsencrypt':
+  #   docker compose --profile letsencrypt -f docker-compose.prod.yml up -d
+  #
+  # On first start it issues a certificate for CERT_DOMAIN, then automatically
+  # renews it every 12 hours (Let's Encrypt certs expire after 90 days).
+  certbot:
+    image: certbot/certbot
+    profiles: [letsencrypt]
+    restart: unless-stopped
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - acme-webroot:/webroot
+    environment:
+      # Your email – Let's Encrypt sends expiry warnings here.
+      - CERTBOT_EMAIL=you@yourdomain.com
+      # Domain to issue the cert for. Must match CERT_DOMAIN in the dropsync service.
+      - CERT_DOMAIN=yourdomain.com
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        certbot certonly --webroot -w /webroot \
+          --email "$$CERTBOT_EMAIL" -d "$$CERT_DOMAIN" \
+          --agree-tos --non-interactive --keep-until-expiring &&
+        trap 'exit 0' TERM &&
+        while :; do sleep 12h & wait $$!; certbot renew --webroot -w /webroot; done
+
+# Named volumes for Option 3. Harmless if certbot is not used.
+volumes:
+  letsencrypt:
+  acme-webroot:
+

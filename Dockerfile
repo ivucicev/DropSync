@@ -21,6 +21,9 @@ FROM node:20-slim
 
 WORKDIR /app
 
+# Install openssl (used by entrypoint to generate self-signed certs when requested)
+RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
+
 # Copy package files and install production dependencies
 COPY package*.json ./
 RUN npm install --omit=dev
@@ -35,11 +38,15 @@ COPY --from=builder /app/src ./src
 # Install tsx globally to run the TypeScript server
 RUN npm install -g tsx
 
+# Copy and prepare the entrypoint script
+COPY entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
+
 # Expose the port the app runs on
 EXPOSE 3000
 
 # Set environment variable to production
 ENV NODE_ENV=production
 
-# Start the server
-CMD ["tsx", "server.ts"]
+# Start via entrypoint (handles optional self-signed cert generation)
+CMD ["./entrypoint.sh"]

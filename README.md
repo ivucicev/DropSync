@@ -56,6 +56,22 @@ Or with Docker:
 docker compose up
 ```
 
+Or pull the prebuilt image from GitHub Container Registry (no build step needed):
+
+```bash
+# Latest build of the main branch
+docker pull ghcr.io/ivucicev/dropsync:main
+
+# Pinned release
+docker pull ghcr.io/ivucicev/dropsync:1.2.3
+```
+
+For production deployments use `docker-compose.prod.yml` — it pulls the prebuilt image and has HTTPS, resource limits, and a health check pre-configured:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
+
 ---
 
 ## How it works
@@ -256,6 +272,53 @@ If `VITE_TURN_URL` is not set, DropSync falls back to Open Relay automatically.
 
 ---
 
+### HTTPS
+
+DropSync supports three HTTPS modes, all configured via environment variables in `docker-compose.prod.yml`.
+
+#### Option 1 — Bring your own certificate
+
+Mount your existing cert and key files into the container and point the environment variables at them:
+
+```yaml
+environment:
+  - TLS_CERT=/certs/fullchain.pem
+  - TLS_KEY=/certs/privkey.pem
+  - PORT=443
+ports:
+  - "443:443"
+volumes:
+  - /etc/letsencrypt/live/yourdomain.com/fullchain.pem:/certs/fullchain.pem:ro
+  - /etc/letsencrypt/live/yourdomain.com/privkey.pem:/certs/privkey.pem:ro
+```
+
+#### Option 2 — Self-signed certificate (LAN / local testing only)
+
+The container auto-generates a cert on first start. Browsers will show a security warning — click through once.  
+**Do not use this for public-facing deployments.**
+
+```yaml
+environment:
+  - GENERATE_SELF_SIGNED_CERT=true
+  - CERT_DOMAIN=localhost   # or your LAN hostname / IP
+```
+
+#### Option 3 — Let's Encrypt (recommended for public deployments)
+
+A bundled `certbot` service issues and automatically renews a free certificate. Your server must be publicly reachable on port 80 for the ACME challenge.
+
+In `docker-compose.prod.yml`, uncomment the Let's Encrypt block and set your domain and e-mail address, then start with the `letsencrypt` profile:
+
+```bash
+docker compose --profile letsencrypt -f docker-compose.prod.yml up -d
+```
+
+Certbot writes the certificate into a named Docker volume. DropSync waits for the cert to appear before starting, then serves on port 443. Port 80 stays open to handle renewals and redirect plain HTTP visitors to HTTPS.
+
+> The `certbot` service only needs to run to issue and renew certs. You can stop it once the cert is in the volume and DropSync is already running.
+
+---
+
 ### Cloudflare Tunnel
 
 If you expose DropSync through a Cloudflare Tunnel (`cloudflared`), two things need attention.
@@ -296,5 +359,8 @@ src/
   services/socket.ts       Socket.IO client
   App.tsx                  Landing page and room routing
 server.ts                  Signaling server
+entrypoint.sh              Container startup script (TLS cert handling)
+docker-compose.yml         Local development
+docker-compose.prod.yml    Production (prebuilt image, HTTPS, resource limits)
 .env.example               Environment variable template
 ```

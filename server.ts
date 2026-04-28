@@ -1,5 +1,7 @@
 import express from "express";
 import { createServer as createHttpServer } from "http";
+import { createServer as createHttpsServer } from "https";
+import { readFileSync } from "fs";
 import { Server } from "socket.io";
 import { createServer as createViteServer } from "vite";
 import path from "path";
@@ -10,7 +12,20 @@ const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
-  const httpServer = createHttpServer(app);
+
+  const tlsCert = process.env.TLS_CERT;
+  const tlsKey = process.env.TLS_KEY;
+  const useHttps = tlsCert && tlsKey;
+
+  const httpServer = useHttps
+    ? createHttpsServer(
+        {
+          cert: readFileSync(tlsCert),
+          key: readFileSync(tlsKey),
+        },
+        app
+      )
+    : createHttpServer(app);
   const io = new Server(httpServer, {
     cors: {
       origin: "*",
@@ -25,7 +40,7 @@ async function startServer() {
     pingTimeout: 5000,
   });
 
-  const PORT = 3000;
+  const PORT = parseInt(process.env.PORT ?? "3000", 10);
 
   // Socket.io signaling logic
   io.on("connection", (socket) => {
@@ -60,6 +75,25 @@ async function startServer() {
     });
   });
 
+  // When HTTPS is active and ACME_WEBROOT is set, start a plain HTTP server on port 80.
+  // It serves Let's Encrypt webroot challenges and redirects everything else to HTTPS.
+  if (useHttps && process.env.ACME_WEBROOT) {
+    const acmeApp = express();
+    const acmeWebroot = process.env.ACME_WEBROOT;
+    acmeApp.use(
+      "/.well-known",
+      express.static(path.join(acmeWebroot, ".well-known"), { dotfiles: "allow" })
+    );
+    acmeApp.use((req, res) => {
+      const host =
+        process.env.CERT_DOMAIN ?? req.headers.host?.split(":")[0] ?? "localhost";
+      res.redirect(301, `https://${host}${req.url}`);
+    });
+    createHttpServer(acmeApp).listen(80, "0.0.0.0", () => {
+      console.log("HTTP→HTTPS redirect + ACME server running on port 80");
+    });
+  }
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -75,7 +109,8 @@ async function startServer() {
   }
 
   httpServer.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    const protocol = useHttps ? "https" : "http";
+    console.log(`Server running on ${protocol}://localhost:${PORT}`);
   });
 }
 
