@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1200" height="140" viewBox="0 0 1200 140"
+     role="img" aria-labelledby="host-title host-desc">
+  <title id="host-title">Self-hosting</title>
+  <desc id="host-desc">The signaling server is a tiny Node.js process that only relays the WebRTC handshake and never touches your files.</desc>
+
+  <rect width="1200" height="140" rx="22" fill="#0a0a0a"/>
+  <rect x="0.75" y="0.75" width="1198.5" height="138.5" rx="21.25" fill="none" stroke="#1c1c1c" stroke-width="1.5"/>
+
+  <g transform="translate(64 48)">
+    <rect width="44" height="44" rx="12" fill="#101010" stroke="#232323" stroke-width="1.25"/>
+    <g transform="translate(11 10)">
+      <rect x="0" y="0" width="22" height="9" rx="2" fill="none" stroke="#8a8a86" stroke-width="1.3"/>
+      <circle cx="4.5" cy="4.5" r="1.4" fill="#8a8a86"/>
+      <rect x="0" y="14" width="22" height="9" rx="2" fill="none" stroke="#34d399" stroke-width="1.3"/>
+      <circle cx="4.5" cy="18.5" r="1.4" fill="#34d399"/>
+    </g>
+  </g>
+
+  <text x="124" y="66" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="24" font-weight="700" letter-spacing="-0.3" fill="#f5f5f0">Self-hosting</text>
+  <text x="124" y="90" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="14" fill="#9a9a95">A tiny relay for the handshake only — then it's completely out of the loop.</text>
+
+  <g font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="11.5" font-weight="600" letter-spacing="1">
+    <g transform="translate(958 55)">
+      <rect width="88" height="28" rx="8" fill="none" stroke="#262626" stroke-width="1.25"/>
+      <text x="14" y="18" fill="#9a9a95">DOCKER</text>
+    </g>
+    <g transform="translate(1054 55)">
+      <rect width="82" height="28" rx="8" fill="none" stroke="#262626" stroke-width="1.25"/>
+      <text x="14" y="18" fill="#9a9a95">NODE.JS</text>
+    </g>
+  </g>
+</svg>

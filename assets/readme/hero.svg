@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1200" height="360" viewBox="0 0 1200 360"
+     role="img" aria-labelledby="hero-title hero-desc">
+  <title id="hero-title">DropSync — peer-to-peer encrypted file transfer</title>
+  <desc id="hero-desc">DropSync opens an encrypted tunnel directly between two browsers. A signaling server only brokers the initial handshake, then a direct WebRTC connection carries files, chat, and keys — the server never sees your data.</desc>
+
+  <defs>
+    <clipPath id="hero-frame">
+      <rect width="1200" height="360" rx="26"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#hero-frame)">
+    <rect width="1200" height="360" fill="#0a0a0a"/>
+    <rect x="0.75" y="0.75" width="1198.5" height="358.5" rx="25.25" fill="none" stroke="#1c1c1c" stroke-width="1.5"/>
+
+    <!-- title block -->
+    <g id="title-block" transform="translate(64 0)">
+      <g transform="translate(0 46)">
+        <rect x="0" y="-13" width="16" height="16" rx="4" fill="#f5f5f0" transform="rotate(45 8 -5)"/>
+        <text x="26" y="4" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="12" font-weight="600" letter-spacing="2" fill="#8a8a86">SECURE TRANSFER · NO ACCOUNTS</text>
+      </g>
+
+      <text x="0" y="130" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="62" font-weight="700" letter-spacing="-1.5" fill="#f5f5f0">DropSync</text>
+
+      <text x="0" y="172" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="19" fill="#b8b8b3">Encrypted tunnel straight between two browsers —</text>
+      <text x="0" y="199" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="19" fill="#b8b8b3">your files go from your machine to theirs. Nowhere else.</text>
+
+      <!-- metadata badges -->
+      <g transform="translate(0 268)" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="12" font-weight="600" letter-spacing="1">
+        <g>
+          <rect x="0" y="0" width="128" height="30" rx="8" fill="none" stroke="#262626" stroke-width="1.25"/>
+          <text x="16" y="19" fill="#9a9a95">WEBRTC P2P</text>
+        </g>
+        <g transform="translate(140 0)">
+          <rect x="0" y="0" width="138" height="30" rx="8" fill="none" stroke="#262626" stroke-width="1.25"/>
+          <text x="16" y="19" fill="#9a9a95">AES-GCM 256</text>
+        </g>
+        <g transform="translate(290 0)">
+          <rect x="0" y="0" width="104" height="30" rx="8" fill="none" stroke="#262626" stroke-width="1.25"/>
+          <text x="16" y="19" fill="#9a9a95">NO CLOUD</text>
+        </g>
+      </g>
+    </g>
+
+    <!-- project-native proof: server steps aside, direct link forms -->
+    <g id="project-proof" transform="translate(0 0)">
+      <text x="941" y="72" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="11" font-weight="600" letter-spacing="1.5" fill="#5c5c58">SIGNALING</text>
+      <circle id="server-node" cx="941" cy="98" r="19" fill="#0d0d0d" stroke="#333330" stroke-width="1.5"/>
+      <rect x="932" y="90" width="18" height="13" rx="2" fill="none" stroke="#4a4a46" stroke-width="1.4"/>
+      <line x1="936" y1="93" x2="946" y2="93" stroke="#4a4a46" stroke-width="1.2"/>
+
+      <g id="handshake-lines">
+        <line x1="798" y1="218" x2="926" y2="110" stroke="#3a3a36" stroke-width="1.5" stroke-dasharray="4 5" stroke-linecap="round"/>
+        <line x1="956" y1="110" x2="1084" y2="218" stroke="#3a3a36" stroke-width="1.5" stroke-dasharray="4 5" stroke-linecap="round"/>
+      </g>
+
+      <g id="handshake-lines-loop">
+        <line x1="798" y1="218" x2="926" y2="110" stroke="#3a3a36" stroke-width="1.5" stroke-dasharray="4 5" stroke-linecap="round"/>
+        <line x1="956" y1="110" x2="1084" y2="218" stroke="#3a3a36" stroke-width="1.5" stroke-dasharray="4 5" stroke-linecap="round"/>
+      </g>
+
+      <g id="direct-link">
+        <line x1="806" y1="240" x2="1076" y2="240" stroke="#34d399" stroke-width="2.5" stroke-linecap="round"/>
+      </g>
+
+      <g id="connected-pulse">
+        <circle cx="941" cy="240" r="10" fill="none" stroke="#34d399" stroke-width="1.5" opacity="0.45"/>
+        <circle cx="941" cy="240" r="4" fill="#34d399"/>
+      </g>
+
+      <circle cx="772" cy="240" r="34" fill="#101010" stroke="#333330" stroke-width="1.5"/>
+      <rect x="757" y="225" width="30" height="22" rx="3" fill="none" stroke="#8a8a86" stroke-width="1.6"/>
+      <line x1="765" y1="231" x2="779" y2="231" stroke="#8a8a86" stroke-width="1.3"/>
+      <text x="772" y="298" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="12" font-weight="600" letter-spacing="1.5" fill="#c9c9c4">YOU</text>
+
+      <circle cx="1110" cy="240" r="34" fill="#101010" stroke="#333330" stroke-width="1.5"/>
+      <rect x="1095" y="225" width="30" height="22" rx="3" fill="none" stroke="#8a8a86" stroke-width="1.6"/>
+      <line x1="1103" y1="231" x2="1117" y2="231" stroke="#8a8a86" stroke-width="1.3"/>
+      <text x="1110" y="298" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="12" font-weight="600" letter-spacing="1.5" fill="#c9c9c4">PEER</text>
+
+      <text x="941" y="332" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="11.5" letter-spacing="1" fill="#5c5c58">DIRECT · ENCRYPTED · NO RELAY</text>
+    </g>
+  </g>
+</svg>

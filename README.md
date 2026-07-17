@@ -1,6 +1,6 @@
-# DropSync
-
-**Send files directly to anyone. No accounts, no cloud, no limits.**
+<p align="center">
+  <img src="./assets/readme/hero.gif" width="100%" alt="DropSync — encrypted peer-to-peer file transfer directly between two browsers. No accounts, no cloud, no limits.">
+</p>
 
 DropSync creates an encrypted tunnel straight between two browsers - your files go from your machine to theirs and nowhere else. Share the link, connect, and drop.
 
@@ -16,7 +16,9 @@ The moment both browsers are connected, the server steps out of the way. Everyth
 
 ---
 
-## Features
+<p align="center">
+  <img src="./assets/readme/section-features.svg" width="100%" alt="Features — everything routes through the browser, nothing routes through us.">
+</p>
 
 **Zero infrastructure overhead**
 Files go directly between devices using WebRTC. The server only brokers the initial handshake, never sees your data.
@@ -92,6 +94,10 @@ Once your peer joins, the connection status turns green. Drag files onto the dro
 
 ### Under the hood
 
+<p align="center">
+  <img src="./assets/readme/workflow.svg" width="100%" alt="Workflow: handshake through the signaling server, negotiate offer/answer and ICE, open a direct link once the server steps aside, then transfer encrypted chunks.">
+</p>
+
 1. Both browsers connect to the signaling server (Socket.IO)
 2. WebRTC offer/answer and ICE candidates are exchanged through the server
 3. A direct peer-to-peer RTCDataChannel is established
@@ -101,7 +107,9 @@ Once your peer joins, the connection status turns green. Drag files onto the dro
 
 ---
 
-## Stack
+<p align="center">
+  <img src="./assets/readme/section-stack.svg" width="100%" alt="Stack — React 19, WebRTC, Socket.IO, Web Crypto API, Vite 6.">
+</p>
 
 | | |
 |---|---|
@@ -113,7 +121,9 @@ Once your peer joins, the connection status turns green. Drag files onto the dro
 
 ---
 
-## Self-hosting
+<p align="center">
+  <img src="./assets/readme/section-self-hosting.svg" width="100%" alt="Self-hosting — a tiny relay for the handshake only, then completely out of the loop.">
+</p>
 
 The signaling server is a tiny Node.js process - it only relays the WebRTC handshake and never touches your files. Once peers connect, the server is completely out of the loop.
 
